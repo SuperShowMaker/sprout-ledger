@@ -1,0 +1,45 @@
+.app-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.app-main > .ant-tabs {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+/* nav翻到底部 */
+.app-main .ant-tabs-nav {
+  margin: 0 !important;
+  background: #fff;
+  border-top: 1px solid #f0f0f0;
+  order: 2;
+}
+
+.app-main .ant-tabs-nav .ant-tabs-tab {
+  padding: 6px 0 !important;
+  font-size: 11px;
+}
+
+.app-main .ant-tabs-nav .ant-tabs-tab .anticon {
+  display: block;
+  font-size: 18px;
+  margin: 0 auto 2px;
+}
+
+/* content在上面 */
+.app-main .ant-tabs-content-holder {
+  flex: 1;
+  min-height: 0;
+  order: 1;
+}
+
+.tab-scroll {
+  height: 100%;
+  overflow-y: auto;
+  padding: 0 8px;
+}

@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -v \"//\\\\|import\\\\|translateCategory\\\\|t\\(\\\\|selectedCat\\\\|cat\\\\.\\\\|categories\")",
+      "Bash(npx vitest *)"
+    ]
+  }
+}
