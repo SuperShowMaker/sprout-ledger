@@ -78,6 +78,12 @@ const translations: Record<Lang, Record<string, string>> = {
     'export.csvHeader': '日期,一级分类,二级分类,金额,备注,记录时间',
     'export.expectedHeaders': '日期|一级分类|二级分类|金额|备注',
 
+    // Backup reminder
+    'backup.title': '数据备份提醒',
+    'backup.content': '已有 {days} 天未备份数据，建议立即导出以防丢失。',
+    'backup.exportNow': '立即导出',
+    'backup.remindLater': '稍后提醒',
+
     // Stats
     'stats.total': '总支出',
     'stats.count': '记录笔数',
@@ -183,6 +189,11 @@ const translations: Record<Lang, Record<string, string>> = {
     'export.filterName': 'CSV File',
     'export.csvHeader': 'Date,Category1,Category2,Amount,Note,CreatedAt',
     'export.expectedHeaders': 'Date|Category1|Category2|Amount|Note|CreatedAt',
+
+    'backup.title': 'Backup Reminder',
+    'backup.content': '{days} days since last backup. Export now to keep your data safe.',
+    'backup.exportNow': 'Export Now',
+    'backup.remindLater': 'Remind Later',
 
     'stats.total': 'Total',
     'stats.count': 'Records',

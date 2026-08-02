@@ -88,7 +88,7 @@ export default function Profile() {
         await writeTextFile(filePath, csv);
         message.success(t('list.exportSuccess', { count: data.length }));
         localStorage.setItem('sprout_last_export', dayjs().format('YYYY-MM-DD'));
-        setShowReminder(false); setExportVisible(false);
+        setExportVisible(false);
       }
     } catch (err) { message.error(`${t('export.failed')}: ${String(err)}`); }
     finally { setExporting(false); }
@@ -150,31 +150,13 @@ export default function Profile() {
   const [showTrend, setShowTrend] = useState(() => getSetting('stats_showTrend', true));
   const [showDailyAvg, setShowDailyAvg] = useState(() => getSetting('stats_showDailyAvg', false));
 
-  // 备份提醒
-  const [showReminder, setShowReminder] = useState(false);
-  const [reminderDays, setReminderDays] = useState(0);
+  // 自动打开导出（来自备份提醒的跳转）
   useEffect(() => {
-    (async () => {
-      try {
-        const lastExport = localStorage.getItem('sprout_last_export');
-        const lastReminded = localStorage.getItem('sprout_reminded_at');
-        const today = dayjs().format('YYYY-MM-DD');
-        const todayDate = new Date(today);
-        if (lastExport) {
-          const days = Math.floor((todayDate.getTime() - new Date(lastExport).getTime()) / 86400000);
-          if (days <= 30) return;
-          if (lastReminded) { const daysSince = Math.floor((todayDate.getTime() - new Date(lastReminded).getTime()) / 86400000); if (daysSince <= 7) return; }
-          setReminderDays(days); setShowReminder(true); return;
-        }
-        const all = await getAllExpensesForExport();
-        if (all.length > 0) {
-          const firstTs = all.reduce((min, e) => (e.created_at && e.created_at < min) ? e.created_at : min, all[0].created_at || '');
-          if (firstTs) { const days = Math.floor((todayDate.getTime() - new Date(firstTs).getTime()) / 86400000); if (days > 30) { setReminderDays(days); setShowReminder(true); } }
-        }
-      } catch {}
-    })();
+    if (sessionStorage.getItem('sprout_auto_export') === '1') {
+      sessionStorage.removeItem('sprout_auto_export');
+      setExportVisible(true);
+    }
   }, []);
-  const dismissReminder = () => { localStorage.setItem('sprout_reminded_at', dayjs().format('YYYY-MM-DD')); setShowReminder(false); };
 
   const menuItems = [
     { key: 'lang', icon: <GlobalOutlined />, label: (<div className="profile-row"><span>{lang === 'zh' ? '语言 / Language' : 'Language'}</span><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ color: '#999', fontSize: 13 }}>{lang === 'zh' ? '中文' : 'English'}</span><Switch checked={lang === 'en'} onChange={toggleLang} size="small" /></div></div>), },
@@ -189,13 +171,6 @@ export default function Profile() {
 
   return (
     <div className="profile-page">
-      {showReminder && (
-        <div className="backup-reminder">
-          <span className="backup-reminder-text">{lang === 'zh' ? `已有 ${reminderDays} 天未备份数据` : `${reminderDays} days since last backup`}</span>
-          <span className="backup-reminder-link" onClick={() => setExportVisible(true)}>{lang === 'zh' ? '立即导出' : 'Export now'}</span>
-          <span className="backup-reminder-close" onClick={dismissReminder}>✕</span>
-        </div>
-      )}
       <div className="profile-header">
         <div className="profile-avatar"><span className="profile-avatar-icon">🌱</span></div>
         <div className="profile-name">{t('app.title')}</div>

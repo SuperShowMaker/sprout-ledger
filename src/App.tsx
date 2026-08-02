@@ -2,9 +2,11 @@
 import { useEffect, useState } from 'react';
 import { App as AntApp } from 'antd';
 import { EditOutlined, CalendarOutlined, PieChartOutlined, UserOutlined } from '@ant-design/icons';
+import dayjs from 'dayjs';
 import { I18nProvider, useI18n } from './i18n/I18nContext';
 import { DataProvider } from './DataContext';
-import { initDatabase } from './db';
+import { initDatabase, getAllExpensesForExport } from './db';
+import { shouldShowReminder, daysSince } from './checkBackupReminder';
 import ExpenseForm from './components/ExpenseForm';
 import ExpenseList from './components/ExpenseList';
 import MonthlyStats from './components/MonthlyStats';
@@ -12,7 +14,8 @@ import Profile from './components/Profile';
 import './App.css';
 
 function AppContent() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const { modal } = AntApp.useApp();
   const [dbReady, setDbReady] = useState(false);
   const [dbError, setDbError] = useState('');
   const [activeTab, setActiveTab] = useState(() => {
@@ -31,6 +34,54 @@ function AppContent() {
         setDbError(String(err));
       });
   }, []);
+
+  // 备份提醒
+  useEffect(() => {
+    if (!dbReady) return;
+    (async () => {
+      try {
+        const lastExport = localStorage.getItem('sprout_last_export');
+        const lastReminded = localStorage.getItem('sprout_reminded_at');
+        const today = dayjs().format('YYYY-MM-DD');
+
+        let firstRecordDate: string | null = null;
+        let reminderDays = 0;
+
+        if (lastExport) {
+          reminderDays = daysSince(lastExport, today);
+        } else {
+          const all = await getAllExpensesForExport();
+          if (all.length > 0) {
+            const firstTs = all.reduce((min, e) =>
+              (e.created_at && e.created_at < min) ? e.created_at : min,
+              all[0].created_at || ''
+            );
+            if (firstTs) {
+              firstRecordDate = firstTs;
+              reminderDays = daysSince(firstTs, today);
+            }
+          }
+        }
+
+        if (!shouldShowReminder({ lastExportDate: lastExport, firstRecordDate, lastRemindedDate: lastReminded, today })) return;
+
+        modal.confirm({
+          title: t('backup.title'),
+          content: t('backup.content', { days: String(reminderDays) }),
+          okText: t('backup.exportNow'),
+          cancelText: t('backup.remindLater'),
+          centered: true,
+          onOk: () => {
+            sessionStorage.setItem('sprout_auto_export', '1');
+            switchTab('profile');
+          },
+          onCancel: () => {
+            localStorage.setItem('sprout_reminded_at', today);
+          },
+        });
+      } catch {}
+    })();
+  }, [dbReady]);
 
   if (dbError) {
     return (
