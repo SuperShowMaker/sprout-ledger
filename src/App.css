@@ -338,6 +338,80 @@ body {
 /* antd 水波纹颜色改为品牌绿 */
 .ant-btn { --antd-wave-shadow-color: #52c41a; }
 
+/* ========== 自定义计算器键盘 ========== */
+.calc-overlay {
+  position: fixed; inset: 0; z-index: 1100;
+  background: rgba(0,0,0,0.3);
+  display: flex; flex-direction: column; justify-content: flex-end;
+  animation: calcFadeIn 0.2s ease;
+}
+@keyframes calcFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.calc-panel {
+  background: #f2f2f7;
+  border-radius: 20px 20px 0 0;
+  padding: 20px 12px max(12px, env(safe-area-inset-bottom));
+  animation: calcSlideUp 0.25s ease;
+}
+@keyframes calcSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+/* 表达式展示区 */
+.calc-display {
+  background: #fff;
+  border-radius: 14px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  min-height: 72px;
+  display: flex; flex-direction: column; justify-content: center;
+}
+.calc-expr {
+  font-size: 28px; font-weight: 600; color: #333;
+  min-height: 36px; line-height: 1.3;
+  word-break: break-all;
+}
+.calc-preview {
+  font-size: 16px; color: #bbb; margin-top: 2px;
+  min-height: 22px;
+}
+
+/* 键盘网格 */
+.calc-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.calc-key {
+  height: 56px; border: none; border-radius: 12px;
+  font-size: 22px; font-weight: 500;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background-color 0.1s ease;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+/* 数字键 */
+.key-num { background: #fff; color: #333; }
+.key-num:active { background: rgba(0,0,0,0.08); }
+
+/* 功能键 C / ⌫ */
+.key-fn { background: #e5e5ea; color: #333; font-size: 18px; }
+.key-fn:active { background: rgba(0,0,0,0.12); }
+
+/* 运算符 */
+.key-op { font-size: 24px; font-weight: 600; }
+.key-add { background: rgba(82,196,26,0.12); color: #52c41a; }
+.key-add:active { background: rgba(82,196,26,0.22); }
+.key-sub { background: rgba(255,140,0,0.1); color: #ff8c00; }
+.key-sub:active { background: rgba(255,140,0,0.2); }
+
+/* 确认键 ✓ */
+.key-confirm {
+  background: #52c41a; color: #fff; font-size: 22px; font-weight: 700;
+}
+.key-confirm:active { background: #45a818; }
+
 /* ========== 暗色模式 ========== */
 [data-theme="dark"] {
   --bg: #1e1e1e;
@@ -507,6 +581,18 @@ body {
 [data-theme="dark"] .ant-picker-cell-disabled::before { background: transparent; }
 [data-theme="dark"] .ant-popconfirm .ant-popover-arrow::before { background: var(--bg-secondary); }
 [data-theme="dark"] .ant-popconfirm .ant-popover-arrow::after { background: var(--bg-secondary); }
+
+/* 暗色模式 - 计算器 */
+[data-theme="dark"] .calc-overlay { background: rgba(0,0,0,0.6); }
+[data-theme="dark"] .calc-panel { background: #1c1c1e; }
+[data-theme="dark"] .calc-display { background: #2c2c2e; }
+[data-theme="dark"] .calc-expr { color: #e8e8e8; }
+[data-theme="dark"] .calc-preview { color: #666; }
+[data-theme="dark"] .key-num { background: #3a3a3c; color: #e8e8e8; }
+[data-theme="dark"] .key-num:active { background: rgba(255,255,255,0.1); }
+[data-theme="dark"] .key-fn { background: #2c2c2e; color: #e8e8e8; }
+[data-theme="dark"] .key-fn:active { background: rgba(255,255,255,0.08); }
+[data-theme="dark"] .key-confirm:active { background: #45a818; }
 
 /* 确认弹窗图标颜色 */
 [data-theme="dark"] .ant-modal-confirm-body > .anticon { color: #faad14 !important; }

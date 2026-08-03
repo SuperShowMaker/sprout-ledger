@@ -7,6 +7,7 @@ import { addExpense } from '../db';
 import { useData } from '../DataContext';
 import { useI18n } from '../i18n/I18nContext';
 import { translateCategory } from '../i18n/categoryTranslations';
+import CalculatorInput from './CalculatorInput';
 
 interface Props {
   onDone: () => void;
@@ -22,6 +23,7 @@ export default function ExpenseForm({ onDone }: Props) {
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [focused, setFocused] = useState(false);
+  const [showCalc, setShowCalc] = useState(false);
   const { categories } = useData();
 
   const currentCategory = categories.find((c) => c.name === selectedCat1);
@@ -80,28 +82,14 @@ export default function ExpenseForm({ onDone }: Props) {
           <span className="amount-prefix">¥</span>
           <input
             className="amount-display"
-            type="number"
-            inputMode="decimal"
-            step="0.01"
-            min="0"
+            type="text"
+            inputMode="none"
             placeholder="0.00"
             value={amount}
-            onChange={(e) => {
-              const val = e.target.value;
-              if (val === '' || /^\d*\.?\d{0,2}$/.test(val)) {
-                setAmount(val);
-              }
-            }}
+            readOnly
+            onClick={() => setShowCalc(true)}
             onFocus={() => setFocused(true)}
-            onBlur={() => {
-              setFocused(false);
-              if (amount !== '' && amount !== '.') {
-                const num = parseFloat(amount);
-                if (!isNaN(num)) setAmount(num.toString());
-              } else if (amount === '.') {
-                setAmount('');
-              }
-            }}
+            onBlur={() => setFocused(false)}
           />
         </div>
       </div>
@@ -169,6 +157,17 @@ export default function ExpenseForm({ onDone }: Props) {
           {t('form.submit')}
         </Button>
       </div>
+
+      <CalculatorInput
+        visible={showCalc}
+        initialValue={amount}
+        onConfirm={(result) => {
+          const val = parseFloat(result.toFixed(2));
+          if (val > 0) setAmount(val.toString());
+          setShowCalc(false);
+        }}
+        onCancel={() => setShowCalc(false)}
+      />
     </div>
   );
 }

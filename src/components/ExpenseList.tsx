@@ -8,6 +8,7 @@ import { useData } from '../DataContext';
 import { useI18n } from '../i18n/I18nContext';
 import { translateCategory } from '../i18n/categoryTranslations';
 import { useBackBlock } from '../useBackBlock';
+import CalculatorInput from './CalculatorInput';
 
 export default function ExpenseList() {
   const { t, lang } = useI18n();
@@ -96,6 +97,7 @@ export default function ExpenseList() {
   const [editCat2, setEditCat2] = useState('');
   const [editNote, setEditNote] = useState('');
   const [editDate, setEditDate] = useState<Dayjs>(dayjs());
+  const [showEditCalc, setShowEditCalc] = useState(false);
 
   const openEdit = (item: Expense, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -249,8 +251,10 @@ export default function ExpenseList() {
             <div className="edit-amount-row">
               <span className="currency">¥</span>
               <input className="amount-display" style={{ width: 180, fontSize: 40 }}
-                value={editAmount} onChange={(e) => setEditAmount(e.target.value)}
-                type="number" step="0.01" min="0" placeholder="0.00" />
+                value={editAmount}
+                type="text" inputMode="none" readOnly
+                onClick={() => setShowEditCalc(true)}
+                placeholder="0.00" />
             </div>
             <div className="edit-cats">
               <Select
@@ -275,6 +279,17 @@ export default function ExpenseList() {
           </div>
         )}
       </Modal>
+
+      <CalculatorInput
+        visible={showEditCalc}
+        initialValue={editAmount}
+        onConfirm={(result) => {
+          const val = parseFloat(result.toFixed(2));
+          if (val > 0) setEditAmount(val.toString());
+          setShowEditCalc(false);
+        }}
+        onCancel={() => setShowEditCalc(false)}
+      />
     </div>
   );
 }
