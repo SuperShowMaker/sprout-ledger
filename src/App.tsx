@@ -14,7 +14,7 @@ import Profile from './components/Profile';
 import './App.css';
 
 function AppContent() {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
   const { modal } = AntApp.useApp();
   const [dbReady, setDbReady] = useState(false);
   const [dbError, setDbError] = useState('');

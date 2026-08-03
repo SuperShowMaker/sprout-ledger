@@ -1,5 +1,8 @@
 /* 青禾记账 - 主样式（自定义标签栏，不依赖antd内部类名） */
-* { margin: 0; padding: 0; box-sizing: border-box; }
+* {
+  margin: 0; padding: 0; box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
 
 @keyframes pulse {
   0%, 100% { opacity: 1; }
@@ -50,8 +53,9 @@ body {
 .app-nav-item {
   display: flex; flex-direction: column; align-items: center;
   padding: 4px 12px; cursor: pointer;
-  color: #bbb; transition: all 0.2s ease;
+  color: #bbb; transition: color 0.2s ease, transform 0.2s ease;
 }
+.app-nav-item:active { opacity: 0.7; }
 .app-nav-item.active { color: #52c41a; }
 
 .app-nav-icon { font-size: 22px; margin-bottom: 2px; transition: transform 0.2s ease; }
@@ -122,26 +126,30 @@ body {
 .category-btn {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   width: 68px; height: 68px; border: none; border-radius: 14px;
-  background: #f7f7f7; cursor: pointer; transition: all 0.2s ease; gap: 2px;
+  background: #f7f7f7; cursor: pointer; transition: background-color 0.12s ease, transform 0.2s ease; gap: 2px;
 }
 .category-btn:hover { background: #f0f0f0; }
+.category-btn:active { background: rgba(0,0,0,0.08); }
 .category-btn.selected { background: #f6ffed; color: #52c41a; box-shadow: 0 2px 12px rgba(82,196,26,0.18); transform: scale(1.05); }
 .category-btn .cat-icon { font-size: 24px; }
 .category-btn .cat-name { font-size: 11px; color: #666; }
 
 .sub-category-tags { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
-.sub-category-tags .ant-tag { cursor: pointer; padding: 4px 12px; font-size: 13px; border-radius: 16px; margin: 0; }
+.sub-category-tags .ant-tag { cursor: pointer; padding: 4px 12px; font-size: 13px; border-radius: 16px; margin: 0; transition: background-color 0.1s ease; }
+.sub-category-tags .ant-tag:active { background: rgba(0,0,0,0.08) !important; }
 
 .record-form .extra-section { display: flex; gap: 12px; align-items: center; margin-bottom: 28px; flex-shrink: 0; }
 .record-form .submit-section { text-align: center; flex-shrink: 0; margin-top: auto; }
 .record-form .submit-section button { width: 200px; height: 48px; font-size: 16px; border-radius: 24px; box-shadow: 0 4px 16px rgba(82,196,26,0.25); transition: all 0.2s ease; }
 .record-form .submit-section button:hover { box-shadow: 0 6px 20px rgba(82,196,26,0.35); transform: translateY(-1px); }
+.record-form .submit-section button:active { transform: scale(0.97) !important; box-shadow: 0 2px 8px rgba(82,196,26,0.2); }
 
 /* 花销条目 */
 .expense-item {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 12px 14px; margin: 4px 0; border-radius: 14px; background: #fff; border-bottom: none; box-shadow: 0 1px 4px rgba(0,0,0,0.03); transition: all 0.15s ease;
+  padding: 12px 14px; margin: 4px 0; border-radius: 14px; background: #fff; border-bottom: none; box-shadow: 0 1px 4px rgba(0,0,0,0.03); transition: background-color 0.1s ease;
 }
+.expense-item:active { background: rgba(0,0,0,0.04); }
 .expense-item .left { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
 .expense-item .category-icon {
   font-size: 24px; width: 40px; height: 40px; display: flex;
@@ -182,8 +190,9 @@ body {
 .stats-section-title { font-size: 15px; font-weight: 600; color: #333; margin-bottom: 12px; }
 
 .stats-bar-item { display: flex; align-items: center; padding: 8px 0; gap: 10px; }
-.stats-bar-item.clickable { cursor: pointer; }
-.stats-bar-item.clickable:hover { background: #fafafa; border-radius: 6px; }
+.stats-bar-item.clickable { cursor: pointer; border-radius: 6px; transition: background-color 0.1s ease; padding: 4px 8px; margin: 0 -8px; }
+.stats-bar-item.clickable:hover { background: #fafafa; }
+.stats-bar-item.clickable:active { background: rgba(0,0,0,0.06); }
 .stats-bar-item .cat-name {
   width: 80px; font-size: 13px; text-align: right; color: #555;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -208,9 +217,10 @@ body {
 .cal-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
 .cal-cell {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  aspect-ratio: 1; border-radius: 10px; cursor: pointer; transition: background 0.15s; position: relative;
+  aspect-ratio: 1; border-radius: 10px; cursor: pointer; transition: background-color 0.1s ease; position: relative;
 }
 .cal-cell:hover { background: #f5f5f5; }
+.cal-cell:active { background: rgba(0,0,0,0.08); }
 .cal-cell.muted { opacity: 0.3; cursor: default; }
 .cal-cell.selected { background: #52c41a !important; color: #fff !important; }
 .cal-cell.today:not(.selected) { box-shadow: inset 0 0 0 2px #1890ff; }
@@ -241,6 +251,7 @@ body {
 .profile-subtitle { font-size: 12px; color: #aaa; letter-spacing: 1px; }
 .profile-row { display: flex; justify-content: space-between; align-items: center; width: 100%; }
 .profile-page .ant-list-item:hover { background: #fafafa; }
+.profile-page .ant-list-item:active { background: rgba(0,0,0,0.06) !important; }
 
 /* 模式药丸 */
 .mode-pills {
@@ -249,8 +260,9 @@ body {
 }
 .mode-pill {
   padding: 3px 14px; font-size: 13px; border-radius: 6px;
-  cursor: pointer; color: #999; transition: all 0.2s;
+  cursor: pointer; color: #999; transition: background-color 0.1s ease;
 }
+.mode-pill:active { background: rgba(0,0,0,0.06); }
 .mode-pill.active {
   background: #fff; color: #52c41a; font-weight: 600;
   box-shadow: 0 1px 3px rgba(0,0,0,0.08);
@@ -260,10 +272,11 @@ body {
 .cat-collapse [class*="content-box"] { padding: 2px 8px 8px !important; }
 .cat-list-group { border-bottom: 1px solid #fafafa; }
 .cat-list-row {
-  display: flex; align-items: center; gap: 10px; padding: 12px 0;
-  cursor: pointer; user-select: none;
+  display: flex; align-items: center; gap: 10px; padding: 12px 8px;
+  cursor: pointer; user-select: none; border-radius: 8px;
+  transition: background-color 0.1s ease;
 }
-.cat-list-row:active { opacity: 0.7; }
+.cat-list-row:active { background: rgba(0,0,0,0.05); }
 .cat-list-row.highlighted { background: #f6ffed; border-radius: 8px; }
 [data-theme="dark"] .cat-list-row.highlighted { background: #1a2e10; }
 .cat-list-icon { font-size: 10px; color: #bbb; width: 14px; flex-shrink: 0; text-align: center; }
@@ -322,6 +335,9 @@ body {
 .edit-modal ~ .ant-modal-footer .ant-btn,
 .ant-modal-confirm .ant-btn { border-radius: 20px; }
 
+/* antd 水波纹颜色改为品牌绿 */
+.ant-btn { --antd-wave-shadow-color: #52c41a; }
+
 /* ========== 暗色模式 ========== */
 [data-theme="dark"] {
   --bg: #1e1e1e;
@@ -353,8 +369,10 @@ body {
 [data-theme="dark"] .edit-amount-row .currency { color: #555; }
 [data-theme="dark"] .category-btn { background: var(--bg-secondary); border-color: var(--border); }
 [data-theme="dark"] .category-btn:hover { border-color: #5a8f3a; background: #2a3520; }
+[data-theme="dark"] .category-btn:active { background: rgba(255,255,255,0.08); }
 [data-theme="dark"] .category-btn.selected { border-color: #73d13d; background: #253620; box-shadow: 0 2px 12px rgba(115,211,61,0.2); }
 [data-theme="dark"] .category-btn .cat-name { color: var(--text-secondary); }
+[data-theme="dark"] .sub-category-tags .ant-tag:active { background: rgba(255,255,255,0.08) !important; }
 
 /* 明细 */
 [data-theme="dark"] .calendar-section { border-color: var(--border); }
@@ -363,6 +381,7 @@ body {
 [data-theme="dark"] .cal-weekday { color: var(--text-muted); }
 [data-theme="dark"] .cal-cell { color: var(--text); }
 [data-theme="dark"] .cal-cell:hover { background: var(--bg-tertiary); }
+[data-theme="dark"] .cal-cell:active { background: rgba(255,255,255,0.08); }
 [data-theme="dark"] .cal-cell.today:not(.selected) { box-shadow: inset 0 0 0 2px #5c9bd5; }
 [data-theme="dark"] .cal-cell.selected { background: #52c41a !important; color: #fff !important; }
 [data-theme="dark"] .cal-dot { background: #73d13d; }
@@ -370,6 +389,7 @@ body {
 [data-theme="dark"] .list-date-header { border-color: var(--border); }
 [data-theme="dark"] .list-date-label { color: var(--text-secondary); }
 [data-theme="dark"] .expense-item { background: var(--bg-secondary); }
+[data-theme="dark"] .expense-item:active { background: rgba(255,255,255,0.05); }
 [data-theme="dark"] .expense-item .info .name { color: var(--text); }
 [data-theme="dark"] .expense-item .amount { color: var(--text); }
 [data-theme="dark"] .expense-item .info .note { color: var(--text-muted); }
@@ -383,6 +403,7 @@ body {
 [data-theme="dark"] .profile-subtitle { color: #666; }
 [data-theme="dark"] .profile-page .ant-list-item { border-color: var(--border); }
 [data-theme="dark"] .profile-page .ant-list-item:hover { background: var(--bg-secondary); }
+[data-theme="dark"] .profile-page .ant-list-item:active { background: rgba(255,255,255,0.06) !important; }
 
 /* 统计 */
 [data-theme="dark"] .stats-card-out { background: linear-gradient(135deg, #253620, #1e3a1a); }
@@ -396,6 +417,10 @@ body {
 [data-theme="dark"] .cat-list-group { border-color: var(--bg-secondary); }
 [data-theme="dark"] .cat-list-row { color: var(--text); }
 [data-theme="dark"] .cat-list-row:hover { background: var(--bg-tertiary); }
+[data-theme="dark"] .cat-list-row:active { background: rgba(255,255,255,0.06); }
+[data-theme="dark"] .stats-bar-item.clickable:hover { background: var(--bg-secondary); }
+[data-theme="dark"] .stats-bar-item.clickable:active { background: rgba(255,255,255,0.06); }
+[data-theme="dark"] .mode-pill:active { background: rgba(255,255,255,0.08); }
 [data-theme="dark"] .cat-list-name { color: var(--text); }
 [data-theme="dark"] .cat-list-bar-wrap { background: #333; }
 [data-theme="dark"] .cat-list-amount { color: var(--text); }
@@ -406,6 +431,7 @@ body {
 
 /* antd 组件 */
 [data-theme="dark"] .ant-btn-primary { background: #52c41a; border-color: #52c41a; }
+[data-theme="dark"] .ant-btn { --antd-wave-shadow-color: #73d13d; }
 [data-theme="dark"] .ant-btn-default { background: var(--bg-tertiary); border-color: var(--border); color: var(--text); }
 [data-theme="dark"] .ant-btn-text { color: var(--text-secondary); }
 [data-theme="dark"] .ant-btn-text:hover { background: var(--bg-tertiary) !important; }

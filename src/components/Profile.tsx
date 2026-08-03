@@ -96,10 +96,10 @@ export default function Profile() {
 
   const handleImport = async () => {
     if (importState.phase !== 'idle') return;
-    importDispatch({ type: 'START' });
     try {
       const filePath = await open({ filters: [{ name: t('export.filterName'), extensions: ['csv'] }], multiple: false });
-      if (!filePath) { importDispatch({ type: 'DISMISS' }); return; }
+      if (!filePath) return;
+      importDispatch({ type: 'START' });
       const content = await readTextFile(String(filePath));
       if (!content.trim()) throw new Error(t('import.emptyFile'));
       if (content.length > 10 * 1024 * 1024) throw new Error(lang === 'zh' ? '文件过大（上限10MB）' : 'File too large (max 10MB)');

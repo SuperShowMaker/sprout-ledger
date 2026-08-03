@@ -36,6 +36,8 @@ export default function ExpenseForm({ onDone }: Props) {
     }
   };
 
+  const isAmountValid = amount.trim() !== '' && parseFloat(amount) > 0;
+
   const handleSubmit = async () => {
     const amountNum = parseFloat(amount);
     if (!amountNum || amountNum <= 0) {
@@ -84,9 +86,22 @@ export default function ExpenseForm({ onDone }: Props) {
             min="0"
             placeholder="0.00"
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === '' || /^\d*\.?\d{0,2}$/.test(val)) {
+                setAmount(val);
+              }
+            }}
             onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
+            onBlur={() => {
+              setFocused(false);
+              if (amount !== '' && amount !== '.') {
+                const num = parseFloat(amount);
+                if (!isNaN(num)) setAmount(num.toString());
+              } else if (amount === '.') {
+                setAmount('');
+              }
+            }}
           />
         </div>
       </div>
@@ -148,6 +163,7 @@ export default function ExpenseForm({ onDone }: Props) {
           icon={<CheckOutlined />}
           onClick={handleSubmit}
           loading={saving}
+          disabled={!isAmountValid || !selectedCat1}
           size="large"
         >
           {t('form.submit')}
