@@ -37,7 +37,8 @@ src/
 │   ├── ExpenseList     # 日历 + 清单 + 编辑弹窗
 │   ├── MonthlyStats    # 周/月/年 + 饼图 + 柱状趋势 + 折叠列表
 │   ├── Profile         # 语言/深色/导出/导入/分类管理
-│   └── CategoryManager # 预设锁定 + 自定义增删
+│   ├── CategoryManager # 预设锁定 + 自定义增删
+│   └── CalculatorInput # 自定义计算器键盘（加减法 + 表达式求值）
 ├── i18n/
 │   ├── I18nContext     # useI18n()：多语言 + 深色模式
 │   ├── translations    # UI 文案中英对照
@@ -60,7 +61,8 @@ src-tauri/
 
 ### 样式 / 组件
 - `flex:1` 的元素自己负责 `overflow-y: auto`（height:100% 链会在 antd 内部断裂）
-- 金额输入用原生 `<input className="amount-display" type="number">`，不用 antd Input
+- 金额输入用 `<input readOnly>` 触发自定义 `CalculatorInput` 键盘（支持加减法表达式求值），不弹系统键盘
+- 所有可交互元素消除 `-webkit-tap-highlight-color`，统一用 `:active` 灰底叠加做点击反馈
 - 弹窗用 `App.useApp().modal`，不用静态 `Modal.confirm`（后者不吃主题）
 - 不依赖 antd 内部类名（v6 CSS-in-JS，类名动态哈希），自绘组件
 - 按钮禁用 → **隐藏**，不是置灰（预设分类直接不渲染编辑/删除按钮）
