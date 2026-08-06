@@ -33,7 +33,7 @@ src/
 ├── App.css             # 全局样式 + 深色模式变量
 ├── db.ts               # SQLite 操作（并发锁 initPromise）
 ├── components/
-│   ├── RecordFlow      # 记一笔全屏向导（FAB 触发）
+│   ├── RecordFlow      # 记账全屏向导（FAB 触发）
 │   ├── ExpenseList     # 日历 + 清单 + 编辑弹窗
 │   ├── MonthlyStats    # 周/月/年 + 饼图 + 柱状趋势 + 折叠列表
 │   ├── BudgetPage      # 预算（总预算为主 + 分类从总分配 + 预算执行）
