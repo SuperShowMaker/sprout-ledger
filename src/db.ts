@@ -426,11 +426,14 @@ export async function getStatsSubCategoriesRange(start: string, end: string, cat
 
 export async function getStatsTrendRange(start: string, end: string, mode: 'day' | 'month'): Promise<TrendPoint[]> {
   const database = await initDatabase();
-  if (mode === 'day' || mode === 'month') {
+  if (mode === 'month') {
     return database.select<TrendPoint[]>(
-      'SELECT date, SUM(amount) as amount FROM expenses WHERE date >= $1 AND date <= $2 GROUP BY date ORDER BY date',
+      "SELECT strftime('%Y-%m', date) as date, SUM(amount) as amount FROM expenses WHERE date >= $1 AND date <= $2 GROUP BY strftime('%Y-%m', date) ORDER BY date",
       [start, end]
     );
   }
-  return [];
+  return database.select<TrendPoint[]>(
+    'SELECT date, SUM(amount) as amount FROM expenses WHERE date >= $1 AND date <= $2 GROUP BY date ORDER BY date',
+    [start, end]
+  );
 }

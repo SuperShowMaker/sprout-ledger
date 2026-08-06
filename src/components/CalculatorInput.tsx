@@ -1,11 +1,23 @@
 // 青禾记账 - 自定义计算器键盘（支持加减法）
 import { useState, useCallback, useEffect, useMemo } from 'react';
+import { DatePicker, Input } from 'antd';
+import dayjs, { Dayjs } from 'dayjs';
+import { useI18n } from '../i18n/I18nContext';
 
 interface Props {
   visible: boolean;
   initialValue: string;
   onConfirm: (result: number) => void;
   onCancel: () => void;
+  // 内嵌模式：键盘直接放入父级布局流（不弹全屏遮罩），用于记一笔向导
+  embedded?: boolean;
+  // 内嵌模式顶栏左侧：所选类别标签（记一笔向导传入"大类 / 子类"）
+  label?: string;
+  // 记账模式：键盘内嵌日期+备注行（其余调用方不传，保持原样）
+  note?: string;
+  date?: Dayjs;
+  onNoteChange?: (s: string) => void;
+  onDateChange?: (d: Dayjs) => void;
 }
 
 // 安全求值："15+8-3" → 20。只用 + -，左到右。
@@ -38,7 +50,8 @@ function isOperator(char: string): boolean {
   return char === '+' || char === '-';
 }
 
-export default function CalculatorInput({ visible, initialValue, onConfirm, onCancel }: Props) {
+export default function CalculatorInput({ visible, initialValue, onConfirm, onCancel, embedded, label, note, date, onNoteChange, onDateChange }: Props) {
+  const { t } = useI18n();
   const [expr, setExpr] = useState('');
 
   useEffect(() => {
@@ -93,7 +106,7 @@ export default function CalculatorInput({ visible, initialValue, onConfirm, onCa
     if (e.key === 'Escape') handleCancel();
   }, [handleCancel]);
 
-  if (!visible) return null;
+  const isRecordMode = note !== undefined && onNoteChange !== undefined && onDateChange !== undefined;
 
   const keys: { label: string; action: () => void; className: string }[] = [
     { label: '7', action: () => append('7'), className: 'key-num' },
@@ -114,29 +127,80 @@ export default function CalculatorInput({ visible, initialValue, onConfirm, onCa
     { label: '✓', action: handleConfirm, className: 'key-confirm' },
   ];
 
+  const displayArea = (
+    <div className="calc-display">
+      <div className="calc-expr">{expr || ' '}</div>
+      {!isRecordMode && (
+        <div className="calc-preview">
+          {preview !== null ? `= ${preview}` : ' '}
+        </div>
+      )}
+    </div>
+  );
+
+  const metaArea = isRecordMode && (
+    <div className="calc-meta">
+      <DatePicker
+        value={date}
+        onChange={(d) => onDateChange(d || dayjs())}
+        allowClear={false}
+        inputReadOnly
+        disabledDate={(d) => d.isAfter(dayjs(), 'day')}
+        popupStyle={{ zIndex: 1300 }}
+        size="small"
+      />
+      <Input
+        value={note}
+        onChange={(e) => onNoteChange(e.target.value)}
+        placeholder={t('form.note')}
+        maxLength={50}
+        size="small"
+      />
+    </div>
+  );
+
+  const gridArea = (
+    <div className="calc-grid">
+      {keys.map((k) => (
+        <button
+          key={k.label}
+          className={`calc-key ${k.className}`}
+          onClick={k.action}
+          type="button"
+        >
+          {k.label}
+        </button>
+      ))}
+    </div>
+  );
+
+  if (embedded) {
+    return (
+      <div className={`calc-embedded-wrap${visible ? ' open' : ''}`}>
+        <div className="calc-panel calc-panel-embedded">
+          {/* 顶栏：返回分类的关闭钮 + 左上角类别标签 + 右上角金额 */}
+          <div className="calc-embedded-top">
+            <button className="calc-embedded-close" onClick={handleCancel} type="button" aria-label={t('cat.cancel')}>✕</button>
+            {label && <div className="calc-embedded-cat">{label}</div>}
+            <div className="calc-display calc-display-inline">
+              <div className="calc-expr">{expr || ' '}</div>
+            </div>
+          </div>
+          {metaArea}
+          {gridArea}
+        </div>
+      </div>
+    );
+  }
+
+  if (!visible) return null;
+
   return (
     <div className="calc-overlay" onClick={handleCancel} onKeyDown={handleKeyDown}>
       <div className="calc-panel" onClick={(e) => e.stopPropagation()}>
-        {/* 表达式展示区 */}
-        <div className="calc-display">
-          <div className="calc-expr">{expr || ' '}</div>
-          <div className="calc-preview">
-            {preview !== null ? `= ${preview}` : ' '}
-          </div>
-        </div>
-        {/* 键盘网格 */}
-        <div className="calc-grid">
-          {keys.map((k) => (
-            <button
-              key={k.label}
-              className={`calc-key ${k.className}`}
-              onClick={k.action}
-              type="button"
-            >
-              {k.label}
-            </button>
-          ))}
-        </div>
+        {displayArea}
+        {metaArea}
+        {gridArea}
       </div>
     </div>
   );

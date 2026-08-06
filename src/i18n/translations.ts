@@ -19,6 +19,9 @@ const translations: Record<Lang, Record<string, string>> = {
     'tab.list': '明细',
     'tab.stats': '统计',
     'tab.profile': '我的',
+    'tab.budget': '预算',
+    'nav.add': '记账',
+    'budget.comingSoon': '功能开发中',
 
     // ExpenseForm
     'form.selectCategory': '选择分类',
@@ -134,6 +137,9 @@ const translations: Record<Lang, Record<string, string>> = {
     'tab.list': 'History',
     'tab.stats': 'Stats',
     'tab.profile': 'Me',
+    'tab.budget': 'Budget',
+    'nav.add': 'Add',
+    'budget.comingSoon': 'Coming soon',
 
     'form.selectCategory': 'Select Category',
     'form.manageCategory': 'Manage Categories',

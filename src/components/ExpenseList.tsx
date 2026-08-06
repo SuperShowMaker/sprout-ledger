@@ -21,7 +21,7 @@ export default function ExpenseList() {
   useEffect(() => { setListLimit(50); }, [selectedDate]);
   useEffect(() => {
     getDatesWithExpenses(viewMonth.format('YYYY-MM')).then(dates => setRecordDates(new Set(dates))).catch(() => {});
-  }, [viewMonth]);
+  }, [viewMonth, tick]);
 
   // 按选中日期加载明细
   useEffect(() => {

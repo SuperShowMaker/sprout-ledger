@@ -1,13 +1,13 @@
 // 青禾记账 - 主应用
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { App as AntApp } from 'antd';
-import { EditOutlined, CalendarOutlined, PieChartOutlined, UserOutlined } from '@ant-design/icons';
+import { CalendarOutlined, PieChartOutlined, UserOutlined, WalletOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { I18nProvider, useI18n } from './i18n/I18nContext';
 import { DataProvider } from './DataContext';
 import { initDatabase, getAllExpensesForExport } from './db';
 import { shouldShowReminder, daysSince } from './checkBackupReminder';
-import ExpenseForm from './components/ExpenseForm';
+import RecordFlow from './components/RecordFlow';
 import ExpenseList from './components/ExpenseList';
 import MonthlyStats from './components/MonthlyStats';
 import Profile from './components/Profile';
@@ -15,11 +15,15 @@ import './App.css';
 
 function AppContent() {
   const { t } = useI18n();
-  const { modal } = AntApp.useApp();
+  const { modal, message } = AntApp.useApp();
   const [dbReady, setDbReady] = useState(false);
   const [dbError, setDbError] = useState('');
+  const [recordOpen, setRecordOpen] = useState(false);
   const [activeTab, setActiveTab] = useState(() => {
-    try { return sessionStorage.getItem('sprout_tab') || 'record'; } catch { return 'record'; }
+    try {
+      const saved = sessionStorage.getItem('sprout_tab');
+      return (saved === 'list' || saved === 'stats' || saved === 'profile') ? saved : 'list';
+    } catch { return 'list'; }
   });
   const switchTab = (tab: string) => {
     setActiveTab(tab);
@@ -102,40 +106,56 @@ function AppContent() {
     );
   }
 
-  const tabs = [
-    { key: 'record', icon: <EditOutlined /> },
+  const tabs: { key: string; icon: ReactNode; placeholder?: boolean }[] = [
     { key: 'list', icon: <CalendarOutlined /> },
     { key: 'stats', icon: <PieChartOutlined /> },
+    { key: 'budget', icon: <WalletOutlined />, placeholder: true },
     { key: 'profile', icon: <UserOutlined /> },
   ];
+  const tabLabels: Record<string, string> = {
+    list: t('tab.list'),
+    stats: t('tab.stats'),
+    budget: t('tab.budget'),
+    profile: t('tab.profile'),
+  };
+  const renderTab = (tab: { key: string; icon: ReactNode; placeholder?: boolean }) => (
+    <div
+      key={tab.key}
+      className={`app-nav-item ${activeTab === tab.key ? 'active' : ''}`}
+      onClick={() => {
+        if (tab.placeholder) { message.info(t('budget.comingSoon')); return; }
+        switchTab(tab.key);
+      }}
+    >
+      <span className="app-nav-icon">{tab.icon}</span>
+      <span className="app-nav-label">{tabLabels[tab.key]}</span>
+    </div>
+  );
 
   return (
     <DataProvider>
       <div className="app-container">
         <div className="app-content">
-          {activeTab === 'record' && <ExpenseForm onDone={() => switchTab('list')} />}
           {activeTab === 'list' && <ExpenseList />}
           {activeTab === 'stats' && <MonthlyStats />}
           {activeTab === 'profile' && <Profile />}
         </div>
 
         <nav className="app-nav">
-          {tabs.map((tab) => (
-            <div
-              key={tab.key}
-              className={`app-nav-item ${activeTab === tab.key ? 'active' : ''}`}
-              onClick={() => switchTab(tab.key)}
-            >
-              <span className="app-nav-icon">{tab.icon}</span>
-              <span className="app-nav-label">
-                {tab.key === 'record' ? t('tab.record') :
-                 tab.key === 'list' ? t('tab.list') :
-                 tab.key === 'stats' ? t('tab.stats') : t('tab.profile')}
-              </span>
-            </div>
-          ))}
+          {tabs.slice(0, 2).map(renderTab)}
+          <div className="app-nav-fab" onClick={() => setRecordOpen(true)}>
+            <span className="app-nav-fab-btn">＋</span>
+            <span className="app-nav-fab-label">{t('nav.add')}</span>
+          </div>
+          {tabs.slice(2).map(renderTab)}
         </nav>
       </div>
+
+      <RecordFlow
+        open={recordOpen}
+        onClose={() => setRecordOpen(false)}
+        onSaved={() => { setRecordOpen(false); switchTab('list'); }}
+      />
     </DataProvider>
   );
 }

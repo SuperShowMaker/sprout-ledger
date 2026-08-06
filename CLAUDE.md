@@ -29,11 +29,11 @@ TDD：红→绿→重构。纯逻辑 100% 覆盖，组件逻辑先抽纯函数�
 
 ```
 src/
-├── App.tsx             # 入口：初始化 DB → 底部导航（4标签）
+├── App.tsx             # 入口：初始化 DB → 底部导航（4标签 + 中央记账FAB）
 ├── App.css             # 全局样式 + 深色模式变量
 ├── db.ts               # SQLite 操作（并发锁 initPromise）
 ├── components/
-│   ├── ExpenseForm     # 记一笔
+│   ├── RecordFlow      # 记一笔全屏向导（FAB 触发）
 │   ├── ExpenseList     # 日历 + 清单 + 编辑弹窗
 │   ├── MonthlyStats    # 周/月/年 + 饼图 + 柱状趋势 + 折叠列表
 │   ├── Profile         # 语言/深色/导出/导入/分类管理

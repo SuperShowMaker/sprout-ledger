@@ -144,7 +144,7 @@ export default function Profile() {
   };
 
   // 统计设置
-  const rowStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', fontSize: 14, borderBottom: '1px solid #f0f0f0' };
+  const rowStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', fontSize: 14 };
   const saveSetting = (key: string, val: boolean) => { localStorage.setItem(`sprout_${key}`, val ? '1' : '0'); window.dispatchEvent(new Event('storage')); };
   const [showPie, setShowPie] = useState(() => getSetting('stats_showPie', true));
   const [showTrend, setShowTrend] = useState(() => getSetting('stats_showTrend', true));
@@ -211,12 +211,12 @@ export default function Profile() {
             <div style={{ textAlign: 'center', padding: '8px 0' }}>
               <div style={{ fontSize: 40, marginBottom: 8 }}>{importState.result.success > 0 ? '✅' : '⚠️'}</div>
               <h3 style={{ margin: '0 0 16px', fontSize: 17, fontWeight: 600 }}>{lang === 'zh' ? '导入结果' : 'Import Results'}</h3>
-              <div style={{ background: '#fafafa', borderRadius: 10, padding: '12px 16px', textAlign: 'left', marginBottom: 4 }}>
-                <div style={rowStyle}><span>{'📄'} {lang === 'zh' ? '总行数' : 'Total'}</span><b>{importState.result.total}</b></div>
-                <div style={rowStyle}><span>{'✅'} {lang === 'zh' ? '成功导入' : 'Imported'}</span><b style={{ color: '#52c41a' }}>{importState.result.success}</b></div>
-                <div style={rowStyle}><span>{'🔄'} {lang === 'zh' ? '跳过重复' : 'Duplicates'}</span><b style={{ color: '#1890ff' }}>{importState.result.skipped}</b></div>
+              <div className="import-result-card" style={{ padding: '12px 16px', textAlign: 'left', marginBottom: 4 }}>
+                <div className="import-result-row" style={rowStyle}><span>{'📄'} {lang === 'zh' ? '总行数' : 'Total'}</span><b>{importState.result.total}</b></div>
+                <div className="import-result-row" style={rowStyle}><span>{'✅'} {lang === 'zh' ? '成功导入' : 'Imported'}</span><b style={{ color: '#52c41a' }}>{importState.result.success}</b></div>
+                <div className="import-result-row" style={rowStyle}><span>{'🔄'} {lang === 'zh' ? '跳过重复' : 'Duplicates'}</span><b style={{ color: '#1890ff' }}>{importState.result.skipped}</b></div>
                 {Object.entries(importState.result.errors).map(([cat, count]) => (
-                  <div key={cat} style={rowStyle}><span>{'⚠️'} {cat}</span><b style={{ color: '#ff4d4f' }}>{count}</b></div>
+                  <div key={cat} className="import-result-row" style={rowStyle}><span>{'⚠️'} {cat}</span><b style={{ color: '#ff4d4f' }}>{count}</b></div>
                 ))}
               </div>
             </div>
@@ -224,7 +224,7 @@ export default function Profile() {
         ) : (
           <div style={{ textAlign: 'center', padding: '16px 0 8px' }}>
             <div style={{ fontSize: 36, marginBottom: 12 }}>{'📥'}</div>
-            <div style={{ height: 6, background: '#f0f0f0', borderRadius: 3, overflow: 'hidden', marginBottom: 8 }}>
+            <div className="import-progress-track" style={{ height: 6, borderRadius: 3, overflow: 'hidden', marginBottom: 8 }}>
               <div style={{ height: '100%', borderRadius: 3, background: 'linear-gradient(90deg, #52c41a, #73d13d)', transition: 'width 0.5s ease',
                 width: importState.progress.total > 0 ? `${Math.round((importState.progress.done / importState.progress.total) * 100)}%` : '10%',
               }} />

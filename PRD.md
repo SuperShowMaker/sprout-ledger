@@ -101,7 +101,7 @@
 |---|------|:--:|:--:|------|
 | 2.1 | **DB Schema 迁移** | M | D | `expenses` 表加 `type TEXT NOT NULL DEFAULT 'expense'`。可选：重命名表为 `transactions`。向下兼容：旧数据默认 type='expense'，无需回填 |
 | 2.2 | **收入分类体系** | M | F+D | 新增预设收入分类：工资收入、奖金收入、投资收益、兼职副业、退款报销、礼金红包、其他收入。约 7 个一级分类，无需二级分类（收入来源简单）。和支出分类分开展示 |
-| 2.3 | **记一笔收支切换** | M | F | ExpenseForm 顶部加 Segmented 控件：[支出 | 收入]。选收入时：分类切换为收入分类列表、金额前缀 ¥ 变绿色→蓝色、按钮文案"记一笔"→"记收入"。CalculatorInput 复用无变化 |
+| 2.3 | **记一笔收支切换** | M | F | RecordFlow 顶部加 Segmented 控件：[支出 | 收入]。选收入时：分类切换为收入分类列表、金额前缀 ¥ 变绿色→蓝色、按钮文案"记账"→"记收入"。CalculatorInput 复用无变化 |
 | 2.4 | **明细列表区分** | M | F | 收支记录共用一个列表，支出金额红色前缀 `-¥`，收入金额绿色/蓝色前缀 `+¥`。日历标记点区分颜色（支出绿点、收入蓝点） |
 | 2.5 | **统计页收支对比** | L | F | 月度汇总卡片拆为：支出 ¥X / 收入 ¥Y / 结余 ¥Z。柱状趋势图叠加收入/支出双色柱。分类统计默认展示支出，可切换查看收入构成。环形图中心显示结余而非支出总额 |
 | 2.6 | **CSV 格式升级** | M | F | 6 列 → 7 列，新增 `类型` 列（支出/收入）。导入兼容旧 6 列格式（无类型列默认视为支出）。导出新版本用 7 列 |
@@ -192,7 +192,7 @@ Phase 5  ░░░░░░░░░░  0%  发布与基础设施
 | 数据模型 | `Expense` 接口无 `type` 字段，`expenses` 表无类型列（[db.ts:8-16](src/db.ts#L8-L16)） | ✗ |
 | SQL 聚合 | `getStatsSummary`/`getStatsByCategory`/`getStatsTrend` 全部无类型过滤，`SUM(amount)` 会混合收支（[db.ts:348-400](src/db.ts#L348-L400)） | ✗ |
 | 分类体系 | 10 个预设分类全是支出类别，无收入分类（[categories.ts:9-13](src/data/categories.ts#L9-L13)） | ✗ |
-| 表单 | ExpenseForm 无收支切换，硬编码 `¥` 前缀和 `amount > 0` 校验（[ExpenseForm.tsx:43-45](src/components/ExpenseForm.tsx#L43-L45)） | ✗ |
+| 表单 | RecordFlow 无收支切换，仅 `amount > 0` 校验（[RecordFlow.tsx:56](src/components/RecordFlow.tsx#L56)）；`¥` 前缀在明细页渲染 | ✗ |
 | 明细列表 | 金额前缀硬编码 `-¥`（[ExpenseList.tsx:201](src/components/ExpenseList.tsx#L201)），日合计直接累加不区分类型 | ✗ |
 | 统计页 | 卡片标题固定"总支出"，环形图+趋势图全按支出聚合（[MonthlyStats.tsx](src/components/MonthlyStats.tsx)） | ✗ |
 | CSV 导出 | 6 列格式：日期,一级分类,二级分类,金额,备注,记录时间。无类型列 | ✗ |
@@ -207,7 +207,7 @@ Phase 5  ░░░░░░░░░░  0%  发布与基础设施
 |------|---------|:--:|------|
 | 数据库 | `db.ts` | 大 | `expenses` 表加 `type` 列（默认 `'expense'`）；新增收入默认分类；`batchAddExpenses` 参数偏移量从 6→7；~10 个聚合查询加 `WHERE type` 过滤；新增收入聚合函数 |
 | 分类 | `categories.ts`, `db.ts` | 中 | 新增 7 个收入一级分类；`categories1` 表加 `kind` 列区分收支；分类翻译补全 |
-| 表单 | `ExpenseForm.tsx` | 中 | 顶端加 Segmented [支出｜收入] 切换；分类列表按类型过滤；金额前缀 ¥ 颜色跟随类型变化 |
+| 表单 | `RecordFlow.tsx` | 中 | 顶端加 Segmented [支出｜收入] 切换；分类列表按类型过滤；金额前缀 ¥ 颜色跟随类型变化 |
 | 明细 | `ExpenseList.tsx` | 中 | 金额渲染区分 `+¥`/`-¥` 和颜色；日/月合计拆支出+收入+结余；编辑弹窗加类型字段 |
 | 统计 | `MonthlyStats.tsx` | 大 | 汇总卡片拆为支出/收入/结余三栏；环形图可切换收支视图；趋势图双色叠加柱；分类统计按类型切换 |
 | CSV | `Profile.tsx`, `translations.ts` | 中 | 6 列→7 列，新增"类型"列；导入兼容旧 6 列格式（无类型默认支出）；索引位置全部 +1 |
