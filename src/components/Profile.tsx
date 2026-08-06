@@ -167,7 +167,7 @@ export default function Profile() {
     { key: 'import', icon: <UploadOutlined />, label: (<div className="profile-row" onClick={handleImport}><span>{lang === 'zh' ? '导入数据' : 'Import Data'}</span><span style={{ color: '#bbb' }}>›</span></div>), },
     { key: 'categories', icon: <SettingOutlined />, label: (<div className="profile-row" onClick={() => setCatManagerOpen(true)}><span>{t('form.manageCategory')}</span><span style={{ color: '#bbb' }}>›</span></div>), },
     ...(_debugOn ? [{ key: 'clearData', icon: <span style={{ fontSize: 18 }}>🗑️</span>, label: (<div className="profile-row" onClick={() => { modal.confirm({ title: lang === 'zh' ? '清空全部数据' : 'Clear All Data', content: lang === 'zh' ? '此操作不可撤销，确定清空所有账单记录？' : 'This cannot be undone. Clear all expenses?', okText: lang === 'zh' ? '清空' : 'Clear', okType: 'danger', cancelText: t('list.cancel'), onOk: async () => { await clearAllExpenses(); message.success(lang === 'zh' ? '已清空' : 'Cleared'); }, }); }}><span style={{ color: '#ff4d4f' }}>{lang === 'zh' ? '清空全部数据' : 'Clear All Data'}</span></div>), }] : []),
-    { key: 'about', icon: <InfoCircleOutlined />, label: (<div className="profile-row" onClick={() => setAboutVisible(true)}><span>{lang === 'zh' ? '关于青禾记账' : 'About'}</span><span style={{ color: '#999', fontSize: 13 }}>v1.0.0</span></div>), },
+    { key: 'about', icon: <InfoCircleOutlined />, label: (<div className="profile-row" onClick={() => setAboutVisible(true)}><span>{lang === 'zh' ? '关于青禾记账' : 'About'}</span><span style={{ color: '#999', fontSize: 13 }}>v1.1.0</span></div>), },
   ];
 
   return (
@@ -249,7 +249,7 @@ export default function Profile() {
         <div style={{ textAlign: 'center', padding: '12px 0 4px' }}>
           <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'linear-gradient(135deg, #f6ffed, #d9f7be)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', fontSize: 32 }}>{'🌱'}</div>
           <h2 style={{ margin: '0 0 4px', fontSize: 20, fontWeight: 700, color: '#333' }}>{t('app.title')}</h2>
-          <p style={{ margin: '0 0 16px', fontSize: 13, color: '#52c41a', fontWeight: 500 }}>v1.0.0</p>
+          <p style={{ margin: '0 0 16px', fontSize: 13, color: '#52c41a', fontWeight: 500 }}>v1.1.0</p>
           <p style={{ margin: 0, fontSize: 13, color: '#888', lineHeight: 1.8 }}>{lang === 'zh' ? '简洁高效的个人记账工具\n本地存储 · 无需联网 · 数据安全' : 'Simple, efficient expense tracker.\nLocal storage · Offline · Private.'}</p>
           <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #f0f0f0', fontSize: 11, color: '#bbb' }}>Tauri 2 · React 19 · SQLite<br />{'©'} 2026 Sprout Ledger</div>
         </div>
