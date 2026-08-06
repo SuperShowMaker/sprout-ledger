@@ -36,6 +36,7 @@ src/
 │   ├── RecordFlow      # 记一笔全屏向导（FAB 触发）
 │   ├── ExpenseList     # 日历 + 清单 + 编辑弹窗
 │   ├── MonthlyStats    # 周/月/年 + 饼图 + 柱状趋势 + 折叠列表
+│   ├── BudgetPage      # 预算（总预算为主 + 分类从总分配 + 预算执行）
 │   ├── Profile         # 语言/深色/导出/导入/分类管理
 │   ├── CategoryManager # 预设锁定 + 自定义增删
 │   └── CalculatorInput # 自定义计算器键盘（加减法 + 表达式求值）

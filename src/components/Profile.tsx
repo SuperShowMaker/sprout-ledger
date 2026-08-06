@@ -29,6 +29,7 @@ export default function Profile() {
 
   // 导出
   const [exportVisible, setExportVisible] = useState(false);
+  const [statsVisible, setStatsVisible] = useState(false);
   const [exportMode, setExportMode] = useState<ExportMode>('all');
   const [exportYear, setExportYear] = useState<Dayjs>(dayjs());
   const [exportMonth, setExportMonth] = useState<Dayjs>(dayjs());
@@ -161,7 +162,7 @@ export default function Profile() {
   const menuItems = [
     { key: 'lang', icon: <GlobalOutlined />, label: (<div className="profile-row"><span>{lang === 'zh' ? '语言 / Language' : 'Language'}</span><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ color: '#999', fontSize: 13 }}>{lang === 'zh' ? '中文' : 'English'}</span><Switch checked={lang === 'en'} onChange={toggleLang} size="small" /></div></div>), },
     { key: 'darkMode', icon: <span style={{ fontSize: 18 }}>{darkMode ? '🌙' : '☀️'}</span>, label: (<div className="profile-row"><span>{lang === 'zh' ? '深色模式' : 'Dark Mode'}</span><Switch checked={darkMode} onChange={() => toggleDark()} size="small" /></div>), },
-    { key: 'stats-settings', icon: <span style={{ fontSize: 18 }}>📊</span>, label: (<div><div className="profile-row"><span>{lang === 'zh' ? '统计显示' : 'Stats'}</span></div><div className="profile-setting-items"><div className="profile-row profile-setting-item"><span style={{ color: '#888' }}>{lang === 'zh' ? '分类饼图' : 'Pie Chart'}</span><Switch checked={showPie} onChange={(v) => { setShowPie(v); saveSetting('stats_showPie', v); }} size="small" /></div><div className="profile-row profile-setting-item"><span style={{ color: '#888' }}>{lang === 'zh' ? '趋势图' : 'Trend'}</span><Switch checked={showTrend} onChange={(v) => { setShowTrend(v); saveSetting('stats_showTrend', v); }} size="small" /></div><div className="profile-row profile-setting-item"><span style={{ color: '#888' }}>{lang === 'zh' ? '日均 & 最大单笔' : 'Daily Avg & Max'}</span><Switch checked={showDailyAvg} onChange={(v) => { setShowDailyAvg(v); saveSetting('stats_showDailyAvg', v); }} size="small" /></div></div></div>), },
+    { key: 'stats-settings', icon: <span style={{ fontSize: 18 }}>📊</span>, label: (<div className="profile-row" onClick={() => setStatsVisible(true)}><span>{lang === 'zh' ? '统计显示' : 'Stats'}</span><span style={{ color: '#bbb' }}>›</span></div>), },
     { key: 'export', icon: <DownloadOutlined />, label: (<div className="profile-row" onClick={() => setExportVisible(true)}><span>{lang === 'zh' ? '导出数据' : 'Export Data'}</span><span style={{ color: '#bbb' }}>›</span></div>), },
     { key: 'import', icon: <UploadOutlined />, label: (<div className="profile-row" onClick={handleImport}><span>{lang === 'zh' ? '导入数据' : 'Import Data'}</span><span style={{ color: '#bbb' }}>›</span></div>), },
     { key: 'categories', icon: <SettingOutlined />, label: (<div className="profile-row" onClick={() => setCatManagerOpen(true)}><span>{t('form.manageCategory')}</span><span style={{ color: '#bbb' }}>›</span></div>), },
@@ -179,7 +180,7 @@ export default function Profile() {
       <List dataSource={menuItems} renderItem={(item) => (
         <List.Item style={{ cursor: 'pointer', padding: '12px 16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%' }}>
-            <span style={{ fontSize: 18, color: '#52c41a' }}>{item.icon}</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, flexShrink: 0, color: '#52c41a', fontSize: 18 }}>{item.icon}</span>
             <div style={{ flex: 1 }}>{item.label}</div>
           </div>
         </List.Item>
@@ -199,6 +200,13 @@ export default function Profile() {
           {exportMode === 'range' && (<Space style={{ width: '100%' }}><DatePicker value={exportStart} onChange={(d) => setExportStart(d || dayjs())} allowClear={false} /><span>~</span><DatePicker value={exportEnd} onChange={(d) => setExportEnd(d || dayjs())} allowClear={false} /></Space>)}
         </div>
         <Button type="primary" icon={<DownloadOutlined />} onClick={handleExport} loading={exporting} block style={{ borderRadius: 20, height: 40 }}>{t('list.exportCSV')}</Button>
+      </Modal>
+      <Modal title={lang === 'zh' ? '统计显示' : 'Stats'} open={statsVisible} onCancel={() => setStatsVisible(false)} footer={null} centered width="min(320px, calc(100vw - 48px))">
+        <div className="profile-setting-items">
+          <div className="profile-row" style={{ padding: '10px 0' }}><span>{lang === 'zh' ? '分类饼图' : 'Pie Chart'}</span><Switch checked={showPie} onChange={(v) => { setShowPie(v); saveSetting('stats_showPie', v); }} size="small" /></div>
+          <div className="profile-row" style={{ padding: '10px 0' }}><span>{lang === 'zh' ? '趋势图' : 'Trend'}</span><Switch checked={showTrend} onChange={(v) => { setShowTrend(v); saveSetting('stats_showTrend', v); }} size="small" /></div>
+          <div className="profile-row" style={{ padding: '10px 0' }}><span>{lang === 'zh' ? '日均 & 最大单笔' : 'Daily Avg & Max'}</span><Switch checked={showDailyAvg} onChange={(v) => { setShowDailyAvg(v); saveSetting('stats_showDailyAvg', v); }} size="small" /></div>
+        </div>
       </Modal>
       <Modal title={t('import.title')} open={importState.phase !== 'idle'} footer={importState.phase === 'done' ? (<Button type="primary" block onClick={() => importDispatch({ type: 'DISMISS' })} style={{ borderRadius: 20, height: 40 }}>{lang === 'zh' ? '知道了' : 'Got it'}</Button>) : null} closable={true} maskClosable={true} onCancel={() => importDispatch({ type: 'DISMISS' })} centered width="min(360px, calc(100vw - 48px))">
         {importState.phase === 'done' ? (

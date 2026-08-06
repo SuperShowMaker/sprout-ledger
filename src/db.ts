@@ -68,6 +68,22 @@ export async function initDatabase(): Promise<Database> {
     )
   `);
 
+  // 预算表（分类默认月度预算，单一规则值，滚动复用）
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS budgets (
+      category1 TEXT PRIMARY KEY,
+      amount REAL NOT NULL
+    )
+  `);
+
+  // 全局设置表（总预算等键值）
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    )
+  `);
+
   // 数据库完整性自检
   try {
     const check = await db.select<[{ integrity_check: string }]>('PRAGMA integrity_check');
@@ -339,6 +355,57 @@ export async function renameCategory2(oldName: string, newName: string, parent: 
     'UPDATE expenses SET category2 = $1 WHERE category2 = $2 AND category1 = $3',
     [newName, oldName, parent]
   );
+}
+
+// 预算：获取所有分类的月度预算（无预算的分类不在结果里）
+export async function getBudgets(): Promise<Record<string, number>> {
+  const database = await initDatabase();
+  const rows = await database.select<{ category1: string; amount: number }[]>(
+    'SELECT category1, amount FROM budgets'
+  );
+  const map: Record<string, number> = {};
+  rows.forEach((r) => { map[r.category1] = r.amount; });
+  return map;
+}
+
+// 预算：设置/更新分类预算（amount > 0 才调用）
+export async function setBudget(category1: string, amount: number): Promise<void> {
+  const database = await initDatabase();
+  await database.execute(
+    'INSERT OR REPLACE INTO budgets (category1, amount) VALUES ($1, $2)',
+    [category1, amount]
+  );
+}
+
+// 预算：清除分类预算
+export async function deleteBudget(category1: string): Promise<void> {
+  const database = await initDatabase();
+  await database.execute('DELETE FROM budgets WHERE category1 = $1', [category1]);
+}
+
+// 全局设置：读（不存在返回 null）
+export async function getSetting(key: string): Promise<string | null> {
+  const database = await initDatabase();
+  const rows = await database.select<{ value: string }[]>(
+    'SELECT value FROM settings WHERE key = $1',
+    [key]
+  );
+  return rows[0]?.value ?? null;
+}
+
+// 全局设置：写
+export async function setSetting(key: string, value: string): Promise<void> {
+  const database = await initDatabase();
+  await database.execute(
+    'INSERT OR REPLACE INTO settings (key, value) VALUES ($1, $2)',
+    [key, value]
+  );
+}
+
+// 全局设置：删
+export async function deleteSetting(key: string): Promise<void> {
+  const database = await initDatabase();
+  await database.execute('DELETE FROM settings WHERE key = $1', [key]);
 }
 
 // ============ 统计聚合（数据库侧计算，避免全量加载到 JS）============

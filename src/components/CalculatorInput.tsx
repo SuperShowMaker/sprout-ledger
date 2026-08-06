@@ -1,6 +1,6 @@
 // 青禾记账 - 自定义计算器键盘（支持加减法）
-import { useState, useCallback, useEffect, useMemo } from 'react';
-import { DatePicker, Input } from 'antd';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { DatePicker, Input, message } from 'antd';
 import dayjs, { Dayjs } from 'dayjs';
 import { useI18n } from '../i18n/I18nContext';
 
@@ -13,6 +13,14 @@ interface Props {
   embedded?: boolean;
   // 内嵌模式顶栏左侧：所选类别标签（记一笔向导传入"大类 / 子类"）
   label?: string;
+  // 全屏遮罩模式顶部标题（预算页设置预算用）
+  title?: string;
+  // 全屏遮罩模式标题下的小字说明（预算页显示剩余可分配额度）
+  subtitle?: string;
+  // 全屏遮罩模式：输入金额上限，超过的输入直接拒绝（预算页分类预算用）
+  max?: number;
+  // 全屏遮罩模式：确认键下方提供清除操作（预算页清除预算用）
+  onClear?: () => void;
   // 记账模式：键盘内嵌日期+备注行（其余调用方不传，保持原样）
   note?: string;
   date?: Dayjs;
@@ -50,9 +58,11 @@ function isOperator(char: string): boolean {
   return char === '+' || char === '-';
 }
 
-export default function CalculatorInput({ visible, initialValue, onConfirm, onCancel, embedded, label, note, date, onNoteChange, onDateChange }: Props) {
+export default function CalculatorInput({ visible, initialValue, onConfirm, onCancel, embedded, label, title, subtitle, max, onClear, note, date, onNoteChange, onDateChange }: Props) {
   const { t } = useI18n();
   const [expr, setExpr] = useState('');
+  // 超限提示节流：避免连按超限数字时每次按键都重置 toast 计时器导致长时间停留
+  const lastMaxToast = useRef(0);
 
   useEffect(() => {
     if (visible) {
@@ -63,23 +73,34 @@ export default function CalculatorInput({ visible, initialValue, onConfirm, onCa
   const preview = useMemo(() => evaluate(expr), [expr]);
 
   const append = useCallback((char: string) => {
-    setExpr((prev) => {
-      if (char === '.') {
-        if (!canAppendDot(prev)) return prev;
+    let candidate: string | null = null;
+    if (char === '.') {
+      if (canAppendDot(expr)) {
         // 表达式为空或末尾是运算符时，补 0
-        if (!prev || isOperator(prev.slice(-1))) return prev + '0.';
-        return prev + '.';
+        candidate = (!expr || isOperator(expr.slice(-1))) ? expr + '0.' : expr + '.';
       }
-      // 运算符
-      if (isOperator(char)) {
-        if (!prev) return prev;
-        if (isOperator(prev.slice(-1))) return prev.slice(0, -1) + char;
-        return prev + char;
+    } else if (isOperator(char)) {
+      if (expr) {
+        candidate = isOperator(expr.slice(-1)) ? expr.slice(0, -1) + char : expr + char;
       }
-      // 数字
-      return prev + char;
-    });
-  }, []);
+    } else {
+      candidate = expr + char;
+    }
+    if (candidate === null) return;
+    // 上限约束：超过 max 的输入被拒绝并提示
+    if (max !== undefined) {
+      const val = evaluate(candidate);
+      if (val !== null && val > max) {
+        const now = Date.now();
+        if (now - lastMaxToast.current > 2000) {
+          lastMaxToast.current = now;
+          message.warning({ content: t('budget.maxExceeded', { amount: String(max) }), key: 'budget-max-exceeded', duration: 1.5 });
+        }
+        return;
+      }
+    }
+    setExpr(candidate);
+  }, [expr, max]);
 
   const backspace = useCallback(() => {
     setExpr((prev) => prev.slice(0, -1));
@@ -198,9 +219,18 @@ export default function CalculatorInput({ visible, initialValue, onConfirm, onCa
   return (
     <div className="calc-overlay" onClick={handleCancel} onKeyDown={handleKeyDown}>
       <div className="calc-panel" onClick={(e) => e.stopPropagation()}>
+        {(title || subtitle) && (
+          <div className="calc-title-wrap">
+            {title && <div className="calc-title">{title}</div>}
+            {subtitle && <div className="calc-subtitle">{subtitle}</div>}
+          </div>
+        )}
         {displayArea}
         {metaArea}
         {gridArea}
+        {onClear && (
+          <button className="calc-clear-btn" type="button" onClick={onClear}>{t('budget.clear')}</button>
+        )}
       </div>
     </div>
   );

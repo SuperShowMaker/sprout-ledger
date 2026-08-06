@@ -10,19 +10,20 @@ import { shouldShowReminder, daysSince } from './checkBackupReminder';
 import RecordFlow from './components/RecordFlow';
 import ExpenseList from './components/ExpenseList';
 import MonthlyStats from './components/MonthlyStats';
+import BudgetPage from './components/BudgetPage';
 import Profile from './components/Profile';
 import './App.css';
 
 function AppContent() {
   const { t } = useI18n();
-  const { modal, message } = AntApp.useApp();
+  const { modal } = AntApp.useApp();
   const [dbReady, setDbReady] = useState(false);
   const [dbError, setDbError] = useState('');
   const [recordOpen, setRecordOpen] = useState(false);
   const [activeTab, setActiveTab] = useState(() => {
     try {
       const saved = sessionStorage.getItem('sprout_tab');
-      return (saved === 'list' || saved === 'stats' || saved === 'profile') ? saved : 'list';
+      return (saved === 'list' || saved === 'stats' || saved === 'budget' || saved === 'profile') ? saved : 'list';
     } catch { return 'list'; }
   });
   const switchTab = (tab: string) => {
@@ -106,10 +107,10 @@ function AppContent() {
     );
   }
 
-  const tabs: { key: string; icon: ReactNode; placeholder?: boolean }[] = [
+  const tabs: { key: string; icon: ReactNode }[] = [
     { key: 'list', icon: <CalendarOutlined /> },
     { key: 'stats', icon: <PieChartOutlined /> },
-    { key: 'budget', icon: <WalletOutlined />, placeholder: true },
+    { key: 'budget', icon: <WalletOutlined /> },
     { key: 'profile', icon: <UserOutlined /> },
   ];
   const tabLabels: Record<string, string> = {
@@ -118,14 +119,11 @@ function AppContent() {
     budget: t('tab.budget'),
     profile: t('tab.profile'),
   };
-  const renderTab = (tab: { key: string; icon: ReactNode; placeholder?: boolean }) => (
+  const renderTab = (tab: { key: string; icon: ReactNode }) => (
     <div
       key={tab.key}
       className={`app-nav-item ${activeTab === tab.key ? 'active' : ''}`}
-      onClick={() => {
-        if (tab.placeholder) { message.info(t('budget.comingSoon')); return; }
-        switchTab(tab.key);
-      }}
+      onClick={() => switchTab(tab.key)}
     >
       <span className="app-nav-icon">{tab.icon}</span>
       <span className="app-nav-label">{tabLabels[tab.key]}</span>
@@ -138,6 +136,7 @@ function AppContent() {
         <div className="app-content">
           {activeTab === 'list' && <ExpenseList />}
           {activeTab === 'stats' && <MonthlyStats />}
+          {activeTab === 'budget' && <BudgetPage />}
           {activeTab === 'profile' && <Profile />}
         </div>
 

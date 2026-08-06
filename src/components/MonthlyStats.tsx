@@ -5,7 +5,7 @@ import { LeftOutlined, RightOutlined, DownOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import { PieChart, Pie, Cell, Sector, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import type { PieSectorDataItem } from 'recharts/types/polar/Pie';
-import { getStatsSummary, getStatsByCategory, getStatsTrend, getStatsSummaryByRange, getStatsByCategoryRange, getStatsTrendRange, getStatsSubCategories, getStatsSubCategoriesRange, CatStat } from '../db';
+import { getStatsSummary, getStatsByCategory, getStatsTrend, getStatsSummaryByRange, getStatsByCategoryRange, getStatsTrendRange, getStatsSubCategories, getStatsSubCategoriesRange, getSetting as getDbSetting, CatStat } from '../db';
 import { useI18n } from '../i18n/I18nContext';
 import { translateCategory } from '../i18n/categoryTranslations';
 
@@ -57,16 +57,17 @@ export default function MonthlyStats() {
   const [maxSingle, setMaxSingle] = useState(0);
   const [cat1Totals, setCat1Totals] = useState<{ category: string; amount: number }[]>([]);
   const [trendData, setTrendData] = useState<{ date: string; amount: number }[]>([]);
+  const [totalBudget, setTotalBudget] = useState(0); // 单一规则值，月模式展示预算执行
 
-  const [showPie, setShowPie] = useState(() => getSetting('stats_showPie', true));
-  const [showTrend, setShowTrend] = useState(() => getSetting('stats_showTrend', true));
+  const [showPie, setShowPie] = useState(() => getSetting('stats_showPie', false));
+  const [showTrend, setShowTrend] = useState(() => getSetting('stats_showTrend', false));
   const [showDailyAvg, setShowDailyAvg] = useState(() => getSetting('stats_showDailyAvg', false));
   const [activeCat, setActiveCat] = useState<string | null>(null);
 
   useEffect(() => {
     const onStorage = () => {
-      setShowPie(getSetting('stats_showPie', true));
-      setShowTrend(getSetting('stats_showTrend', true));
+      setShowPie(getSetting('stats_showPie', false));
+      setShowTrend(getSetting('stats_showTrend', false));
       setShowDailyAvg(getSetting('stats_showDailyAvg', false));
     };
     window.addEventListener('storage', onStorage);
@@ -121,6 +122,9 @@ export default function MonthlyStats() {
 
   useEffect(() => { load(); setExpanded({}); }, [mode, date]);
   useEffect(() => {
+    getDbSetting('total_budget').then((v) => setTotalBudget(v ? parseFloat(v) || 0 : 0)).catch(() => {});
+  }, []);
+  useEffect(() => {
     try { sessionStorage.setItem('sprout_stats_date', date.format('YYYY-MM-DD')); } catch {}
   }, [date]);
 
@@ -141,6 +145,11 @@ export default function MonthlyStats() {
   const isLeap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
   const dayCount = mode === 'week' ? 7 : mode === 'year' ? (isLeap ? 366 : 365) : date.daysInMonth();
   const dailyAvg = count > 0 ? total / dayCount : 0;
+
+  // 概览卡：预算执行派生（月模式 + 已设总预算时有效）
+  const overviewPct = mode === 'month' && totalBudget > 0 ? (total / totalBudget) * 100 : 0;
+  const overviewRemaining = totalBudget - total;
+  const overviewColor = overviewPct >= 100 ? '#ff4d4f' : overviewPct >= 80 ? '#faad14' : '#52c41a';
 
   // 懒加载子分类
   const [cat2Cache, setCat2Cache] = useState<Record<string, CatStat[]>>({});
@@ -199,29 +208,46 @@ export default function MonthlyStats() {
         <div className="empty-stats"><div className="empty-icon">📊</div><p>{t('stats.noData', { period: '' })}</p></div>
       ) : (
         <>
-          {/* 概览卡片 */}
-          <div className="stats-summary">
-            <div className="stats-card-out">
-              <div className="label">{t('stats.total')}</div>
-              <div className="value">¥{total.toFixed(2)}</div>
+          {/* 本月概览大卡：总支出 + 笔数/日均/最大 + 预算执行 */}
+          <div className="stats-overview">
+            <div className="stats-overview-top">
+              <div>
+                <div className="stats-overview-label">{t('stats.total')}</div>
+                <div className="stats-overview-amount">¥{total.toFixed(2)}</div>
+              </div>
+              {mode === 'month' && totalBudget > 0 && (
+                <svg width="76" height="76" viewBox="0 0 76 76" className="stats-overview-ring">
+                  <circle cx="38" cy="38" r={26} fill="none" stroke="rgba(0,0,0,0.08)" strokeWidth="8" />
+                  <circle cx="38" cy="38" r={26} fill="none" stroke={overviewColor} strokeWidth="8" strokeLinecap="round"
+                    strokeDasharray={`${(Math.min(overviewPct, 100) / 100) * (2 * Math.PI * 26)} ${2 * Math.PI * 26}`} transform="rotate(-90 38 38)" />
+                  <text x="38" y="41" textAnchor="middle" dominantBaseline="middle" style={{ fontSize: 15, fontWeight: 700, fill: overviewColor }}>
+                    {overviewPct >= 1000 ? `${Math.round(overviewPct / 100)}×` : `${overviewPct.toFixed(0)}%`}
+                  </text>
+                </svg>
+              )}
             </div>
-            <div className="stats-card-count">
-              <div className="label">{t('stats.count')}</div>
-              <div className="value">{count}</div>
+            <div className="stats-overview-meta">
+              <span>{t('stats.count')} {count}</span>
+              {showDailyAvg && (
+                <>
+                  <span>· {lang === 'zh' ? '日均' : 'Daily'} ¥{dailyAvg.toFixed(0)}</span>
+                  <span>· {lang === 'zh' ? '最大' : 'Max'} ¥{maxSingle.toFixed(0)}</span>
+                </>
+              )}
             </div>
+            {mode === 'month' && totalBudget > 0 && (
+              <div className="stats-overview-budget">
+                <div className="budget-bar">
+                  <div className="budget-bar-fill" style={{ width: `${Math.min(overviewPct, 100)}%`, background: overviewColor }} />
+                </div>
+                <div className="stats-overview-budget-foot" style={{ color: overviewRemaining < 0 ? '#ff4d4f' : undefined }}>
+                  {t('budget.total')} ¥{totalBudget.toFixed(0)} · {overviewRemaining < 0
+                    ? t('budget.overShort', { amount: Math.abs(overviewRemaining).toFixed(0) })
+                    : `${t('budget.remaining')} ¥${overviewRemaining.toFixed(0)}`}
+                </div>
+              </div>
+            )}
           </div>
-          {showDailyAvg && (
-            <div className="stats-summary" style={{ marginTop: 8 }}>
-              <div className="stats-card-count">
-                <div className="label">{lang === 'zh' ? '日均' : 'Daily Avg'}</div>
-                <div className="value" style={{ color: '#1890ff' }}>¥{dailyAvg.toFixed(2)}</div>
-              </div>
-              <div className="stats-card-count">
-                <div className="label">{lang === 'zh' ? '最大单笔' : 'Max'}</div>
-                <div className="value" style={{ color: '#faad14' }}>¥{maxSingle.toFixed(2)}</div>
-              </div>
-            </div>
-          )}
 
           {/* 环形图：小类合并为「其他」，点扇区联动下方列表 */}
           {showPie && (

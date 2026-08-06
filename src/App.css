@@ -163,21 +163,20 @@ body {
 .empty-list .empty-icon { font-size: 48px; margin-bottom: 12px; }
 
 /* 统计 */
-.stats-summary { display: flex; gap: 12px; margin-bottom: 20px; }
-.stats-card-out {
-  flex: 1; text-align: center; padding: 20px 16px;
-  background: linear-gradient(135deg, #f6ffed, #d9f7be); border-radius: 16px;
-}
-.stats-card-out .label { font-size: 13px; color: #888; margin-bottom: 6px; }
-.stats-card-out .value { font-size: clamp(20px, 6vw, 32px); font-weight: 700; color: #52c41a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.stats-card-count {
-  flex: 1; text-align: center; padding: 20px 16px;
-  background: #fafafa; border-radius: 16px;
-}
-.stats-card-count .label { font-size: 13px; color: #888; margin-bottom: 6px; }
-.stats-card-count .value { font-size: clamp(20px, 6vw, 32px); font-weight: 700; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
 .stats-section-title { font-size: 15px; font-weight: 600; color: #333; margin-bottom: 12px; }
+
+/* 本月概览大卡 */
+.stats-overview {
+  background: linear-gradient(135deg, #f6ffed, #e6fffb);
+  border-radius: 16px; padding: 16px; margin-bottom: 16px;
+}
+.stats-overview-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.stats-overview-label { font-size: 13px; color: #888; }
+.stats-overview-amount { font-size: 30px; font-weight: 700; color: #333; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stats-overview-ring { flex-shrink: 0; }
+.stats-overview-meta { font-size: 12px; color: #999; margin-top: 10px; }
+.stats-overview-budget { margin-top: 12px; }
+.stats-overview-budget-foot { font-size: 12px; color: #999; margin-top: 6px; }
 
 .stats-bar-item { display: flex; align-items: center; padding: 8px 0; gap: 10px; }
 .stats-bar-item.clickable { cursor: pointer; border-radius: 6px; transition: background-color 0.1s ease; padding: 4px 8px; margin: 0 -8px; }
@@ -257,6 +256,125 @@ body {
   background: #fff; color: #52c41a; font-weight: 600;
   box-shadow: 0 1px 3px rgba(0,0,0,0.08);
 }
+
+/* 预算 */
+.budget-page { padding-bottom: 24px; }
+.budget-page-title {
+  font-size: 17px; font-weight: 600; color: #333;
+  text-align: center; padding: 4px 0 16px;
+}
+/* 分类预算分区标题 + 右侧「＋」 */
+.budget-section {
+  display: flex; align-items: center; justify-content: space-between;
+  margin: 16px 0 10px;
+}
+.budget-section-title { font-size: 15px; font-weight: 600; color: #333; }
+.budget-section-alloc { font-size: 12px; font-weight: 400; color: #999; }
+.budget-section-add {
+  width: 28px; height: 28px; border: none; border-radius: 50%;
+  background: #f5f5f5; color: #666; font-size: 16px; line-height: 1;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.budget-section-add:active { background: #e8e8e8; color: #52c41a; }
+
+.budget-add-first {
+  width: 100%; padding: 13px 0;
+  border: 1px dashed #d9d9d9; border-radius: 12px;
+  background: transparent; color: #52c41a; font-size: 14px; font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.budget-add-first:active { background: rgba(82,196,26,0.08); border-color: #52c41a; }
+
+.budget-total-card {
+  display: flex; align-items: center; gap: 16px;
+  background: linear-gradient(135deg, #f6ffed, #e6fffb);
+  border-radius: 16px; padding: 18px 16px; margin-bottom: 12px;
+  cursor: pointer; transition: background 0.1s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.budget-total-card:active { background: linear-gradient(135deg, #ecffdd, #dffbf3); }
+.budget-total-card.setup {
+  flex-direction: column; text-align: center; justify-content: center; gap: 8px; padding: 30px 16px;
+}
+.budget-total-setup-icon { font-size: 40px; line-height: 1; }
+.budget-total-setup-title { font-size: 17px; font-weight: 600; color: #333; }
+.budget-ring { flex-shrink: 0; }
+.budget-total-info { flex: 1; min-width: 0; }
+.budget-total-spent { font-size: 13px; color: #888; display: flex; flex-direction: column; }
+.budget-total-spent b { font-size: 20px; font-weight: 700; color: #333; margin-top: 2px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.budget-total-meta { font-size: 12px; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.budget-total-meta-remaining { font-weight: 600; }
+.budget-total-meta-daily { color: #999; }
+.budget-total-projection { font-size: 12px; font-weight: 600; margin-top: 4px; overflow-wrap: anywhere; }
+
+.budget-history-note {
+  font-size: 12px; color: #bbb; text-align: center; margin-bottom: 12px; line-height: 1.6;
+}
+
+/* 分类预算单行紧凑列表 */
+.budget-row-list { display: flex; flex-direction: column; gap: 8px; }
+.budget-row {
+  display: flex; align-items: center; gap: 10px;
+  background: #fafafa; border-radius: 10px; padding: 9px 12px;
+  cursor: pointer; transition: background-color 0.1s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.budget-row:active { background: rgba(0,0,0,0.06); }
+.budget-row-icon { font-size: 18px; line-height: 1; flex-shrink: 0; }
+.budget-row-name { font-size: 13px; color: #333; flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.budget-row-bar { flex: 1; min-width: 24px; }
+/* 百分比不设固定宽，按内容伸缩；极端数值用省略号兜底，不再压到进度条 */
+.budget-row-pct { font-size: 12px; font-weight: 600; flex-shrink: 0; max-width: 76px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.budget-row-value { font-size: 12px; color: #999; flex-shrink: 0; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.budget-row-over { font-size: 12px; font-weight: 600; color: #ff4d4f; flex-shrink: 0; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.budget-bar { height: 6px; background: #f0f0f0; border-radius: 3px; overflow: hidden; }
+.budget-bar-fill { height: 100%; border-radius: 3px; transition: width 0.2s ease; }
+
+/* 加载骨架 */
+.budget-skeleton { display: flex; flex-direction: column; gap: 8px; }
+.budget-skeleton-row {
+  height: 44px; border-radius: 10px;
+  background: linear-gradient(90deg, #f5f5f5 25%, #ececec 50%, #f5f5f5 75%);
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.2s infinite;
+}
+@keyframes skeletonShimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+/* 分类选择弹窗 */
+.budget-picker-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px 8px;
+}
+.budget-picker-item {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 10px 4px; border-radius: 12px; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.budget-picker-item:active { background: rgba(0,0,0,0.06); }
+.budget-picker-icon { font-size: 24px; line-height: 1; }
+/* 未设预算：降饱和+降透明度，按下恢复彩色，避免纯灰的「禁用」误读 */
+.budget-picker-icon.unset {
+  filter: grayscale(1) opacity(0.5);
+  transition: filter 0.15s ease, opacity 0.15s ease;
+}
+.budget-picker-item:active .budget-picker-icon.unset {
+  filter: none; opacity: 1;
+}
+.budget-picker-name { font-size: 12px; color: #333; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.budget-picker-value { font-size: 11px; color: #52c41a; font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 预算编辑键盘：标题 + 副说明 + 清除 */
+.calc-title-wrap { text-align: center; margin-bottom: 12px; }
+.calc-title { font-size: 15px; font-weight: 600; color: #333; }
+.calc-subtitle { font-size: 12px; color: #999; margin-top: 4px; }
+.calc-clear-btn {
+  width: 100%; margin-top: 12px; height: 40px;
+  border: 1px solid #ffd6d6; border-radius: 12px;
+  background: #fff1f0; color: #ff4d4f; font-size: 14px; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.calc-clear-btn:active { background: #ffd6d6; }
 
 /* 折叠列表 */
 .cat-collapse [class*="content-box"] { padding: 2px 8px 8px !important; }
@@ -531,11 +649,12 @@ body {
 [data-theme="dark"] .profile-page .ant-list-item:active { background: rgba(255,255,255,0.06) !important; }
 
 /* 统计 */
-[data-theme="dark"] .stats-card-out { background: linear-gradient(135deg, #253620, #1e3a1a); }
-[data-theme="dark"] .stats-card-count { background: var(--bg-secondary); }
-[data-theme="dark"] .stats-card-count .label { color: var(--text-muted); }
-[data-theme="dark"] .stats-card-count .value { color: var(--text); }
 [data-theme="dark"] .stats-section-title { color: var(--text); }
+[data-theme="dark"] .stats-overview { background: linear-gradient(135deg, #253620, #1e3a32); }
+[data-theme="dark"] .stats-overview-label { color: var(--text-muted); }
+[data-theme="dark"] .stats-overview-amount { color: var(--text); }
+[data-theme="dark"] .stats-overview-meta { color: var(--text-muted); }
+[data-theme="dark"] .stats-overview-budget-foot { color: var(--text-muted); }
 [data-theme="dark"] .mode-pills { background: var(--bg-tertiary); }
 [data-theme="dark"] .mode-pill { color: var(--text-muted); }
 [data-theme="dark"] .mode-pill.active { background: #333; color: #73d13d; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
@@ -547,6 +666,33 @@ body {
 [data-theme="dark"] .stats-bar-item.clickable:active { background: rgba(255,255,255,0.06); }
 [data-theme="dark"] .mode-pill:active { background: rgba(255,255,255,0.08); }
 [data-theme="dark"] .cat-list-name { color: var(--text); }
+[data-theme="dark"] .budget-page-title { color: var(--text); }
+[data-theme="dark"] .budget-section-title { color: var(--text); }
+[data-theme="dark"] .budget-section-add { background: var(--bg-tertiary); color: var(--text-secondary); }
+[data-theme="dark"] .budget-section-add:active { background: #3a3a3a; color: #73d13d; }
+[data-theme="dark"] .budget-total-card { background: linear-gradient(135deg, #253620, #1e3a32); }
+[data-theme="dark"] .budget-total-card:active { background: linear-gradient(135deg, #2a4022, #22423a); }
+[data-theme="dark"] .budget-total-setup-title { color: var(--text); }
+[data-theme="dark"] .budget-total-spent { color: var(--text-muted); }
+[data-theme="dark"] .budget-total-spent b { color: var(--text); }
+[data-theme="dark"] .budget-total-meta-daily { color: var(--text-muted); }
+[data-theme="dark"] .budget-history-note { color: var(--text-muted); }
+[data-theme="dark"] .budget-section-alloc { color: var(--text-muted); }
+[data-theme="dark"] .budget-add-first { border-color: var(--border); color: #73d13d; }
+[data-theme="dark"] .budget-add-first:active { background: rgba(115,211,61,0.1); }
+[data-theme="dark"] .budget-row { background: var(--bg-secondary); }
+[data-theme="dark"] .budget-row:active { background: rgba(255,255,255,0.08); }
+[data-theme="dark"] .budget-row-name { color: var(--text); }
+[data-theme="dark"] .budget-bar { background: var(--bg-tertiary); }
+[data-theme="dark"] .budget-row-value { color: var(--text-muted); }
+[data-theme="dark"] .budget-skeleton-row { background: linear-gradient(90deg, #252525 25%, #2d2d2d 50%, #252525 75%); background-size: 200% 100%; }
+[data-theme="dark"] .budget-picker-item:active { background: rgba(255,255,255,0.08); }
+[data-theme="dark"] .budget-picker-name { color: var(--text); }
+[data-theme="dark"] .budget-picker-value { color: #73d13d; }
+[data-theme="dark"] .calc-title { color: var(--text); }
+[data-theme="dark"] .calc-subtitle { color: var(--text-muted); }
+[data-theme="dark"] .calc-clear-btn { background: rgba(255,77,79,0.15); border-color: rgba(255,77,79,0.4); color: #ff7875; }
+[data-theme="dark"] .calc-clear-btn:active { background: rgba(255,77,79,0.25); }
 [data-theme="dark"] .cat-list-bar-wrap { background: #333; }
 [data-theme="dark"] .cat-list-amount { color: var(--text); }
 [data-theme="dark"] .cat-list-sub-name { color: var(--text-secondary); }
