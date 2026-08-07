@@ -53,6 +53,7 @@ export default function MonthlyStats() {
   });
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
+  const [incomeTotal, setIncomeTotal] = useState(0);
   const [count, setCount] = useState(0);
   const [maxSingle, setMaxSingle] = useState(0);
   const [cat1Totals, setCat1Totals] = useState<{ category: string; amount: number }[]>([]);
@@ -82,12 +83,12 @@ export default function MonthlyStats() {
   const load = async () => {
     setLoading(true);
     try {
-      let summary; let cats: CatStat[]; let trend: { date: string; amount: number }[];
+      let summary; let income; let cats: CatStat[]; let trend: { date: string; amount: number }[];
       switch (mode) {
         case 'month': {
           const m = date.format('YYYY-MM');
-          [summary, cats, trend] = await Promise.all([
-            getStatsSummary(m), getStatsByCategory(m),
+          [summary, income, cats, trend] = await Promise.all([
+            getStatsSummary(m), getStatsSummary(m, 'income'), getStatsByCategory(m),
             getStatsTrend(m, 'day'),
           ]);
           break;
@@ -95,8 +96,8 @@ export default function MonthlyStats() {
         case 'year': {
           const s = date.startOf('year').format('YYYY-MM-DD');
           const e = date.endOf('year').format('YYYY-MM-DD');
-          [summary, cats, trend] = await Promise.all([
-            getStatsSummaryByRange(s, e), getStatsByCategoryRange(s, e),
+          [summary, income, cats, trend] = await Promise.all([
+            getStatsSummaryByRange(s, e), getStatsSummaryByRange(s, e, 'income'), getStatsByCategoryRange(s, e),
             getStatsTrendRange(s, e, 'month'),
           ]);
           break;
@@ -104,14 +105,15 @@ export default function MonthlyStats() {
         case 'week': {
           const s = date.startOf('week').format('YYYY-MM-DD');
           const e = date.endOf('week').format('YYYY-MM-DD');
-          [summary, cats, trend] = await Promise.all([
-            getStatsSummaryByRange(s, e), getStatsByCategoryRange(s, e),
+          [summary, income, cats, trend] = await Promise.all([
+            getStatsSummaryByRange(s, e), getStatsSummaryByRange(s, e, 'income'), getStatsByCategoryRange(s, e),
             getStatsTrendRange(s, e, 'day'),
           ]);
           break;
         }
       }
       setTotal(summary.total);
+      setIncomeTotal(income.total);
       setCount(summary.count);
       setMaxSingle(summary.maxSingle);
       setCat1Totals(cats.map(c => ({ category: c.category, amount: c.amount })));
@@ -145,6 +147,7 @@ export default function MonthlyStats() {
   const isLeap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
   const dayCount = mode === 'week' ? 7 : mode === 'year' ? (isLeap ? 366 : 365) : date.daysInMonth();
   const dailyAvg = count > 0 ? total / dayCount : 0;
+  const balance = incomeTotal - total;
 
   // 概览卡：预算执行派生（月模式 + 已设总预算时有效）
   const overviewPct = mode === 'month' && totalBudget > 0 ? (total / totalBudget) * 100 : 0;
@@ -204,7 +207,7 @@ export default function MonthlyStats() {
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: 60 }}><Spin /></div>
-      ) : total === 0 ? (
+      ) : total === 0 && incomeTotal === 0 ? (
         <div className="empty-stats"><div className="empty-icon">📊</div><p>{t('stats.noData', { period: '' })}</p></div>
       ) : (
         <>
@@ -235,6 +238,12 @@ export default function MonthlyStats() {
                 </>
               )}
             </div>
+            {incomeTotal > 0 && (
+              <div className="stats-overview-balance">
+                <span>{t('stats.income')} <b style={{ color: '#52c41a' }}>¥{incomeTotal.toFixed(2)}</b></span>
+                <span>{t('stats.balance')} <b style={{ color: balance >= 0 ? '#52c41a' : '#ff4d4f' }}>¥{balance.toFixed(2)}</b></span>
+              </div>
+            )}
             {mode === 'month' && totalBudget > 0 && (
               <div className="stats-overview-budget">
                 <div className="budget-bar">
@@ -249,8 +258,8 @@ export default function MonthlyStats() {
             )}
           </div>
 
-          {/* 环形图：小类合并为「其他」，点扇区联动下方列表 */}
-          {showPie && (
+          {/* 环形图：小类合并为「其他」，点扇区联动下方列表。纯收入月无支出数据时不渲染 */}
+          {showPie && total > 0 && (
             <ResponsiveContainer width="100%" height={220} style={{ marginTop: 16 }}>
               <PieChart>
                 <Pie

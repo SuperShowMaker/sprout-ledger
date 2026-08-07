@@ -12,6 +12,7 @@ interface DataState {
   catIcons: Record<string, string>;
   monthTotal: number;
   monthCount: number;
+  monthIncome: number;
   viewMonth: Dayjs;
   loading: boolean;
   tick: number;
@@ -27,6 +28,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [viewMonth, setViewMonth] = useState<Dayjs>(dayjs());
   const [monthTotal, setMonthTotal] = useState(0);
   const [monthCount, setMonthCount] = useState(0);
+  const [monthIncome, setMonthIncome] = useState(0);
   const [loading, setLoading] = useState(true);
   const [tick, setTick] = useState(0);
 
@@ -37,13 +39,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
     (async () => {
       setLoading(true);
       try {
-        const [summary, cats] = await Promise.all([
-          getStatsSummary(viewMonth.format('YYYY-MM')),
+        const monthStr = viewMonth.format('YYYY-MM');
+        const [summary, income, cats] = await Promise.all([
+          getStatsSummary(monthStr),
+          getStatsSummary(monthStr, 'income'),
           getCategories(),
         ]);
         if (cancelled) return;
         setMonthTotal(summary.total);
         setMonthCount(summary.count);
+        setMonthIncome(income.total);
         setCategories(cats);
         const m: Record<string, string> = {};
         cats.forEach((c) => { m[c.name] = c.icon; });
@@ -58,7 +63,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [viewMonth, tick]);
 
   return (
-    <DataContext.Provider value={{ expenses: [], categories, catIcons, monthTotal, monthCount, viewMonth, loading, setViewMonth, refresh, tick }}>
+    <DataContext.Provider value={{ expenses: [], categories, catIcons, monthTotal, monthCount, monthIncome, viewMonth, loading, setViewMonth, refresh, tick }}>
       {children}
     </DataContext.Provider>
   );

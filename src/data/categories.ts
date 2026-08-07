@@ -35,6 +35,19 @@ export const defaultCat2Names = [
   '其他杂项', '手续费', '临时支出',
 ];
 
+// 收入预设分类（仅一级，无子类）。前端常量方案：不入 categories1 表，避免改分类 schema
+export const incomeCategories: Category[] = [
+  { name: '工资收入', icon: '💰', children: [] },
+  { name: '奖金收入', icon: '🏆', children: [] },
+  { name: '投资收益', icon: '📈', children: [] },
+  { name: '兼职副业', icon: '💻', children: [] },
+  { name: '退款报销', icon: '↩️', children: [] },
+  { name: '礼金红包', icon: '🧧', children: [] },
+  { name: '其他收入', icon: '🪙', children: [] },
+];
+
+export const incomeCat1Names = incomeCategories.map((c) => c.name);
+
 export const defaultCategories: Category[] = [
   {
     name: '餐饮饮食',

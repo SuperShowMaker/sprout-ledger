@@ -7,20 +7,25 @@ import { deleteExpense, updateExpense, getDatesWithExpenses, getExpensesByDate, 
 import { useData } from '../DataContext';
 import { useI18n } from '../i18n/I18nContext';
 import { translateCategory } from '../i18n/categoryTranslations';
+import { incomeCategories } from '../data/categories';
+import { formatAmount, isIncome, splitDayTotals } from '../format';
 import { useBackBlock } from '../useBackBlock';
 import CalculatorInput from './CalculatorInput';
 
 export default function ExpenseList() {
   const { t, lang } = useI18n();
-  const { categories, catIcons, viewMonth, monthTotal, monthCount, tick, setViewMonth, refresh } = useData();
+  const { categories, catIcons, viewMonth, monthTotal, monthCount, monthIncome, tick, setViewMonth, refresh } = useData();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>(dayjs().format('YYYY-MM-DD'));
   const [listLimit, setListLimit] = useState(50);
   const [recordDates, setRecordDates] = useState<Set<string>>(new Set());
+  const [incomeDates, setIncomeDates] = useState<Set<string>>(new Set());
   useEffect(() => { setListLimit(50); }, [selectedDate]);
   useEffect(() => {
-    getDatesWithExpenses(viewMonth.format('YYYY-MM')).then(dates => setRecordDates(new Set(dates))).catch(() => {});
+    const m = viewMonth.format('YYYY-MM');
+    getDatesWithExpenses(m).then(dates => setRecordDates(new Set(dates))).catch(() => {});
+    getDatesWithExpenses(m, 'income').then(dates => setIncomeDates(new Set(dates))).catch(() => {});
   }, [viewMonth, tick]);
 
   // 按选中日期加载明细
@@ -49,7 +54,7 @@ export default function ExpenseList() {
     const offset = startDay === 0 ? 6 : startDay - 1;
     const gridStart = startOfMonth.subtract(offset, 'day');
     const today = dayjs().format('YYYY-MM-DD');
-    const weeks: { date: string; day: number; isCurrentMonth: boolean; hasRecord: boolean; isToday: boolean }[][] = [];
+    const weeks: { date: string; day: number; isCurrentMonth: boolean; hasRecord: boolean; hasIncome: boolean; isToday: boolean }[][] = [];
 
     for (let w = 0; w < 6; w++) {
       const week: typeof weeks[0] = [];
@@ -61,19 +66,21 @@ export default function ExpenseList() {
           day: date.date(),
           isCurrentMonth: date.month() === viewMonth.month(),
           hasRecord: recordDates.has(dateStr),
+          hasIncome: incomeDates.has(dateStr),
           isToday: dateStr === today,
         });
       }
       weeks.push(week);
     }
     return { weeks };
-  }, [recordDates, viewMonth]);
+  }, [recordDates, incomeDates, viewMonth]);
 
   const selectedExpenses = useMemo(
     () => expenses.filter((e) => e.date === selectedDate),
     [expenses, selectedDate]
   );
   const selectedDayTotal = selectedExpenses.reduce((s, e) => s + e.amount, 0);
+  const { expense: dayExpense, income: dayIncome } = splitDayTotals(selectedExpenses);
   const isCurrentMonth = viewMonth.isSame(dayjs(), 'month');
 
   const [deleteTarget, setDeleteTarget] = useState<Expense | null>(null);
@@ -128,7 +135,8 @@ export default function ExpenseList() {
     refresh();
   };
 
-  const getIcon = (cat1: string) => catIcons[cat1] || '📦';
+  const getIcon = (cat1: string) =>
+    catIcons[cat1] || incomeCategories.find((c) => c.name === cat1)?.icon || '📦';
 
   const formatDay = (dateStr: string) => {
     const d = new Date(dateStr);
@@ -163,6 +171,7 @@ export default function ExpenseList() {
                 >
                   <span className="cal-day">{cell.day}</span>
                   {cell.hasRecord && <span className="cal-dot" />}
+                  {cell.hasIncome && <span className="cal-dot income" />}
                 </div>
               ))}
             </div>
@@ -170,6 +179,9 @@ export default function ExpenseList() {
         </div>
         <div className="cal-summary">
           {viewMonth.format(lang === 'zh' ? 'M月合计' : 'Monthly total')} ¥{monthTotal.toFixed(2)}
+          {monthIncome > 0 && (
+            <span style={{ color: '#52c41a', marginLeft: 8, fontSize: 12 }}>· {t('list.income')} ¥{monthIncome.toFixed(2)}</span>
+          )}
           <span style={{ color: '#999', marginLeft: 8, fontSize: 12 }}>· {monthCount} {lang === 'zh' ? '笔' : ''}</span>
         </div>
       </div>
@@ -177,7 +189,12 @@ export default function ExpenseList() {
       <div className="list-section">
         <div className="list-date-header">
           <span className="list-date-label">{formatDay(selectedDate)}</span>
-          {selectedDayTotal > 0 && <span className="list-date-total">{t('list.dayTotal')} ¥{selectedDayTotal.toFixed(2)}</span>}
+          {selectedDayTotal > 0 && (
+            <span className="list-date-total">
+              {t('list.dayTotal')} ¥{dayExpense.toFixed(2)}
+              {dayIncome > 0 && <span style={{ color: '#52c41a', marginLeft: 6 }}>· {t('list.income')} ¥{dayIncome.toFixed(2)}</span>}
+            </span>
+          )}
         </div>
 
         {loading && <div className="empty-list"><p>{t('list.loading')}</p></div>}
@@ -198,7 +215,9 @@ export default function ExpenseList() {
                     <div className="note">{item.note ? `${item.note} · ` : ''}{item.created_at?.slice(11, 19) || ''}</div>
                   </div>
                 </div>
-                <span className="amount">-¥{item.amount.toFixed(2)}</span>
+                <span className={`amount${isIncome(item) ? ' income' : ''}`}>
+                  {formatAmount(item.type, item.amount)}
+                </span>
                 <Button type="text" size="small" icon={<EditOutlined />} onClick={(e) => openEdit(item, e)} className="expense-edit-btn" />
                 <Button type="text" size="small" danger icon={<DeleteOutlined />} onClick={(e) => handleDelete(item, e)} className="expense-delete-btn" />
               </div>
@@ -261,18 +280,20 @@ export default function ExpenseList() {
                 value={editCat1}
                 onChange={(v) => { setEditCat1(v); setEditCat2(''); }}
                 style={{ width: '100%' }}
-                options={categories.map((c) => ({ value: c.name, label: `${c.icon} ${translateCategory(lang, c.name)}` }))}
+                options={(editItem?.type === 'income' ? incomeCategories : categories).map((c) => ({ value: c.name, label: `${c.icon} ${translateCategory(lang, c.name)}` }))}
               />
-              <Select
-                value={editCat2 || undefined}
-                onChange={(v) => setEditCat2(v || '')}
-                allowClear
-                style={{ width: '100%' }}
-                placeholder={lang === 'zh' ? '未分类' : 'Uncategorized'}
-                options={(categories.find((c) => c.name === editCat1)?.children || []).map((sub) => ({
-                  value: sub, label: translateCategory(lang, sub),
-                }))}
-              />
+              {editItem?.type !== 'income' && (
+                <Select
+                  value={editCat2 || undefined}
+                  onChange={(v) => setEditCat2(v || '')}
+                  allowClear
+                  style={{ width: '100%' }}
+                  placeholder={lang === 'zh' ? '未分类' : 'Uncategorized'}
+                  options={(categories.find((c) => c.name === editCat1)?.children || []).map((sub) => ({
+                    value: sub, label: translateCategory(lang, sub),
+                  }))}
+                />
+              )}
             </div>
             <DatePicker value={editDate} onChange={(d) => setEditDate(d || dayjs())} allowClear={false} inputReadOnly disabledDate={(d) => d.isAfter(dayjs(), 'day')} style={{ width: '100%', marginBottom: 12 }} />
             <Input placeholder={t('form.note')} value={editNote} onChange={(e) => setEditNote(e.target.value)} maxLength={50} />

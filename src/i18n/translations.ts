@@ -21,6 +21,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'tab.profile': '我的',
     'tab.budget': '预算',
     'nav.add': '记账',
+    'nav.addIncome': '记收入',
 
     // Budget
     'budget.total': '总预算',
@@ -46,6 +47,8 @@ const translations: Record<Lang, Record<string, string>> = {
     'budget.saveFailed': '保存失败',
 
     // ExpenseForm
+    'form.expense': '支出',
+    'form.income': '收入',
     'form.selectCategory': '选择分类',
     'form.manageCategory': '管理分类',
     'form.note': '添加备注',
@@ -73,6 +76,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'list.noDataMonth': '{month}没有数据',
     'list.loading': '加载中...',
     'list.dayTotal': '支出',
+    'list.income': '收入',
     'list.today': '今天',
     'list.yesterday': '昨天',
     'list.allMonths': '全部月份',
@@ -100,7 +104,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'export.all': '_全部',
     'export.filePrefix': '青禾记账_导出',
     'export.filterName': 'CSV文件',
-    'export.csvHeader': '日期,一级分类,二级分类,金额,备注,记录时间',
+    'export.csvHeader': '日期,一级分类,二级分类,金额,备注,记录时间,类型',
     'export.expectedHeaders': '日期|一级分类|二级分类|金额|备注',
 
     // Backup reminder
@@ -111,6 +115,8 @@ const translations: Record<Lang, Record<string, string>> = {
 
     // Stats
     'stats.total': '总支出',
+    'stats.income': '收入',
+    'stats.balance': '结余',
     'stats.count': '记录笔数',
     'stats.noData': '{period}暂无支出记录',
     'stats.categoryBreakdown': '分类占比',
@@ -161,6 +167,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'tab.profile': 'Me',
     'tab.budget': 'Budget',
     'nav.add': 'Add',
+    'nav.addIncome': 'Add Income',
 
     // Budget
     'budget.total': 'Total',
@@ -185,6 +192,8 @@ const translations: Record<Lang, Record<string, string>> = {
     'budget.clear': 'Clear budget',
     'budget.saveFailed': 'Failed to save',
 
+    'form.expense': 'Expense',
+    'form.income': 'Income',
     'form.selectCategory': 'Select Category',
     'form.manageCategory': 'Manage Categories',
     'form.note': 'Add note',
@@ -211,6 +220,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'list.noDataMonth': 'No data for {month}',
     'list.loading': 'Loading...',
     'list.dayTotal': 'Expense',
+    'list.income': 'Income',
     'list.today': 'Today',
     'list.yesterday': 'Yesterday',
     'list.allMonths': 'All months',
@@ -237,8 +247,8 @@ const translations: Record<Lang, Record<string, string>> = {
     'export.all': '_All',
     'export.filePrefix': 'Sprout_Export',
     'export.filterName': 'CSV File',
-    'export.csvHeader': 'Date,Category1,Category2,Amount,Note,CreatedAt',
-    'export.expectedHeaders': 'Date|Category1|Category2|Amount|Note|CreatedAt',
+    'export.csvHeader': 'Date,Category1,Category2,Amount,Note,CreatedAt,Type',
+    'export.expectedHeaders': 'Date|Category1|Category2|Amount|Note|CreatedAt|Type',
 
     'backup.title': 'Backup Reminder',
     'backup.content': '{days} days since last backup. Export now to keep your data safe.',
@@ -246,6 +256,8 @@ const translations: Record<Lang, Record<string, string>> = {
     'backup.remindLater': 'Remind Later',
 
     'stats.total': 'Total',
+    'stats.income': 'Income',
+    'stats.balance': 'Balance',
     'stats.count': 'Records',
     'stats.noData': 'No expenses for {period}',
     'stats.categoryBreakdown': 'Category Breakdown',

@@ -12,6 +12,15 @@ const cat1Map: Record<string, Record<Lang, string>> = {
   '休闲娱乐': { zh: '休闲娱乐', en: 'Entertainment' },
   '人情社交': { zh: '人情社交', en: 'Social' },
   '其他支出': { zh: '其他支出', en: 'Others' },
+
+  // 收入预设
+  '工资收入': { zh: '工资收入', en: 'Salary' },
+  '奖金收入': { zh: '奖金收入', en: 'Bonus' },
+  '投资收益': { zh: '投资收益', en: 'Investment' },
+  '兼职副业': { zh: '兼职副业', en: 'Side Hustle' },
+  '退款报销': { zh: '退款报销', en: 'Refund' },
+  '礼金红包': { zh: '礼金红包', en: 'Gift Money' },
+  '其他收入': { zh: '其他收入', en: 'Other Income' },
 };
 
 const cat2Map: Record<string, Record<Lang, string>> = {

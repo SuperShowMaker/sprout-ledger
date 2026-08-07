@@ -5,8 +5,12 @@ import { defaultCategories } from './data/categories';
 let db: Database | null = null;
 let initPromise: Promise<Database> | null = null;
 
+export type TxType = 'expense' | 'income';
+
 export interface Expense {
   id?: number;
+  // 交易类型（旧数据缺省为 expense）。编辑时不可变更，改类型需删除重建
+  type?: TxType;
   amount: number;
   category1: string;
   category2: string;
@@ -32,10 +36,11 @@ export async function initDatabase(): Promise<Database> {
   initPromise = (async () => {
     db = await Database.load('sqlite:qinghe-ledger.db');
 
-  // 花销表
+  // 花销表（type 区分支出/收入，均为正数，方向靠 type）
   await db.execute(`
     CREATE TABLE IF NOT EXISTS expenses (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      type TEXT NOT NULL DEFAULT 'expense',
       amount REAL NOT NULL,
       category1 TEXT NOT NULL,
       category2 TEXT NOT NULL,
@@ -47,6 +52,12 @@ export async function initDatabase(): Promise<Database> {
   await db.execute('CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date)');
   await db.execute('CREATE INDEX IF NOT EXISTS idx_expenses_cat1 ON expenses(category1)');
   await db.execute('CREATE INDEX IF NOT EXISTS idx_expenses_created ON expenses(created_at)');
+
+  // 迁移：已有库补 type 列（新建库的 CREATE 已含，此步幂等）
+  const expenseCols = await db.select<{ name: string }[]>(`PRAGMA table_info(expenses)`);
+  if (!expenseCols.some((c) => c.name === 'type')) {
+    await db.execute(`ALTER TABLE expenses ADD COLUMN type TEXT NOT NULL DEFAULT 'expense'`);
+  }
 
   // 一级分类表
   await db.execute(`
@@ -126,8 +137,8 @@ export async function initDatabase(): Promise<Database> {
 export async function addExpense(expense: Expense): Promise<number> {
   const database = await initDatabase();
   const result = await database.execute(
-    'INSERT INTO expenses (amount, category1, category2, date, note) VALUES ($1, $2, $3, $4, $5)',
-    [expense.amount, expense.category1, expense.category2, expense.date, expense.note || '']
+    'INSERT INTO expenses (type, amount, category1, category2, date, note) VALUES ($1, $2, $3, $4, $5, $6)',
+    [expense.type || 'expense', expense.amount, expense.category1, expense.category2, expense.date, expense.note || '']
   );
   return result.lastInsertId as number;
 }
@@ -140,19 +151,19 @@ export async function batchAddExpenses(
   if (expenses.length === 0) return 0;
   const database = await initDatabase();
   const total = expenses.length;
-  const BATCH = 50; // 50行×6列=300参数，SQLite安全上限999
+  const BATCH = 50; // 50行×7列=350参数，SQLite安全上限999
 
   for (let start = 0; start < total; start += BATCH) {
     const chunk = expenses.slice(start, start + BATCH);
     const values: string[] = [];
     const params: (string | number)[] = [];
     chunk.forEach((e, i) => {
-      const off = i * 6;
-      values.push(`($${off + 1}, $${off + 2}, $${off + 3}, $${off + 4}, $${off + 5}, $${off + 6})`);
-      params.push(e.amount, e.category1, e.category2 || '', e.date, e.note || '', e.created_at || '');
+      const off = i * 7;
+      values.push(`($${off + 1}, $${off + 2}, $${off + 3}, $${off + 4}, $${off + 5}, $${off + 6}, $${off + 7})`);
+      params.push(e.type || 'expense', e.amount, e.category1, e.category2 || '', e.date, e.note || '', e.created_at || '');
     });
     await database.execute(
-      `INSERT INTO expenses (amount, category1, category2, date, note, created_at) VALUES ${values.join(', ')}`,
+      `INSERT INTO expenses (type, amount, category1, category2, date, note, created_at) VALUES ${values.join(', ')}`,
       params
     );
     if (onProgress) onProgress(Math.min(start + BATCH, total), total);
@@ -244,20 +255,20 @@ export async function countExpensesByCategory(cat1: string, cat2?: string): Prom
   return result[0]?.cnt || 0;
 }
 
-export async function getMonthlyStats(month: string): Promise<{
+export async function getMonthlyStats(month: string, type: TxType = 'expense'): Promise<{
   total: number;
   byCategory: { category: string; amount: number; count: number }[];
 }> {
   const database = await initDatabase();
   const totalResult = await database.select<[{ total: number }]>(
-    'SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE strftime(\'%Y-%m\', date) = $1',
-    [month]
+    'SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE strftime(\'%Y-%m\', date) = $1 AND type = $2',
+    [month, type]
   );
   const total = totalResult[0]?.total || 0;
 
   const byCategory = await database.select<{ category: string; amount: number; count: number }[]>(
-    'SELECT category1 as category, SUM(amount) as amount, COUNT(*) as count FROM expenses WHERE strftime(\'%Y-%m\', date) = $1 GROUP BY category1 ORDER BY amount DESC',
-    [month]
+    'SELECT category1 as category, SUM(amount) as amount, COUNT(*) as count FROM expenses WHERE strftime(\'%Y-%m\', date) = $1 AND type = $2 GROUP BY category1 ORDER BY amount DESC',
+    [month, type]
   );
 
   return { total, byCategory };
@@ -412,95 +423,95 @@ export async function deleteSetting(key: string): Promise<void> {
 
 export interface StatsSummary { total: number; count: number; maxSingle: number }
 
-export async function getStatsSummary(month: string): Promise<StatsSummary> {
+export async function getStatsSummary(month: string, type: TxType = 'expense'): Promise<StatsSummary> {
   const database = await initDatabase();
   const rows = await database.select<[{ total: number; count: number; max_amount: number }]>(
-    "SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as count, COALESCE(MAX(amount), 0) as max_amount FROM expenses WHERE strftime('%Y-%m', date) = $1",
-    [month]
+    "SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as count, COALESCE(MAX(amount), 0) as max_amount FROM expenses WHERE strftime('%Y-%m', date) = $1 AND type = $2",
+    [month, type]
   );
   return { total: rows[0].total, count: rows[0].count, maxSingle: rows[0].max_amount };
 }
 
 export interface CatStat { category: string; amount: number; count: number }
 
-export async function getStatsByCategory(month: string): Promise<CatStat[]> {
+export async function getStatsByCategory(month: string, type: TxType = 'expense'): Promise<CatStat[]> {
   const database = await initDatabase();
   return database.select<CatStat[]>(
-    "SELECT category1 as category, SUM(amount) as amount, COUNT(*) as count FROM expenses WHERE strftime('%Y-%m', date) = $1 GROUP BY category1 ORDER BY amount DESC",
-    [month]
+    "SELECT category1 as category, SUM(amount) as amount, COUNT(*) as count FROM expenses WHERE strftime('%Y-%m', date) = $1 AND type = $2 GROUP BY category1 ORDER BY amount DESC",
+    [month, type]
   );
 }
 
 export interface TrendPoint { date: string; amount: number }
 
-export async function getStatsTrend(month: string, mode: 'day' | 'month'): Promise<TrendPoint[]> {
+export async function getStatsTrend(month: string, mode: 'day' | 'month', type: TxType = 'expense'): Promise<TrendPoint[]> {
   const database = await initDatabase();
   if (mode === 'day') {
     return database.select<TrendPoint[]>(
-      "SELECT date, SUM(amount) as amount FROM expenses WHERE strftime('%Y-%m', date) = $1 GROUP BY date ORDER BY date",
-      [month]
+      "SELECT date, SUM(amount) as amount FROM expenses WHERE strftime('%Y-%m', date) = $1 AND type = $2 GROUP BY date ORDER BY date",
+      [month, type]
     );
   } else {
     const year = month.slice(0, 4);
     return database.select<TrendPoint[]>(
-      "SELECT strftime('%Y-%m', date) as date, SUM(amount) as amount FROM expenses WHERE strftime('%Y', date) = $1 GROUP BY strftime('%Y-%m', date) ORDER BY date",
-      [year]
+      "SELECT strftime('%Y-%m', date) as date, SUM(amount) as amount FROM expenses WHERE strftime('%Y', date) = $1 AND type = $2 GROUP BY strftime('%Y-%m', date) ORDER BY date",
+      [year, type]
     );
   }
 }
 
-export async function getStatsSummaryByRange(start: string, end: string): Promise<StatsSummary> {
+export async function getStatsSummaryByRange(start: string, end: string, type: TxType = 'expense'): Promise<StatsSummary> {
   const database = await initDatabase();
   const rows = await database.select<[{ total: number; count: number; max_amount: number }]>(
-    'SELECT COALESCE(SUM(amount),0) as total, COUNT(*) as count, COALESCE(MAX(amount),0) as max_amount FROM expenses WHERE date >= $1 AND date <= $2',
-    [start, end]
+    'SELECT COALESCE(SUM(amount),0) as total, COUNT(*) as count, COALESCE(MAX(amount),0) as max_amount FROM expenses WHERE date >= $1 AND date <= $2 AND type = $3',
+    [start, end, type]
   );
   return { total: rows[0].total, count: rows[0].count, maxSingle: rows[0].max_amount };
 }
 
-export async function getStatsByCategoryRange(start: string, end: string): Promise<CatStat[]> {
+export async function getStatsByCategoryRange(start: string, end: string, type: TxType = 'expense'): Promise<CatStat[]> {
   const database = await initDatabase();
   return database.select<CatStat[]>(
-    'SELECT category1 as category, SUM(amount) as amount, COUNT(*) as count FROM expenses WHERE date >= $1 AND date <= $2 GROUP BY category1 ORDER BY amount DESC',
-    [start, end]
+    'SELECT category1 as category, SUM(amount) as amount, COUNT(*) as count FROM expenses WHERE date >= $1 AND date <= $2 AND type = $3 GROUP BY category1 ORDER BY amount DESC',
+    [start, end, type]
   );
 }
 
-// 日历绿点：只返回有数据的日期
-export async function getDatesWithExpenses(month: string): Promise<string[]> {
+// 日历标记：按类型返回有数据的日期（支出绿点 / 收入蓝点）
+export async function getDatesWithExpenses(month: string, type: TxType = 'expense'): Promise<string[]> {
   const database = await initDatabase();
-  const rows = await database.select<[{ date: string }]>(
-    "SELECT DISTINCT date FROM expenses WHERE strftime('%Y-%m', date) = $1", [month]
+  const rows = await database.select<{ date: string }[]>(
+    "SELECT DISTINCT date FROM expenses WHERE strftime('%Y-%m', date) = $1 AND type = $2", [month, type]
   );
   return rows.map(r => r.date);
 }
 
-export async function getStatsSubCategories(month: string, cat1: string): Promise<CatStat[]> {
+export async function getStatsSubCategories(month: string, cat1: string, type: TxType = 'expense'): Promise<CatStat[]> {
   const database = await initDatabase();
   return database.select<CatStat[]>(
-    "SELECT category2 as category, SUM(amount) as amount, COUNT(*) as count FROM expenses WHERE strftime('%Y-%m', date) = $1 AND category1 = $2 GROUP BY category2 ORDER BY amount DESC",
-    [month, cat1]
+    "SELECT category2 as category, SUM(amount) as amount, COUNT(*) as count FROM expenses WHERE strftime('%Y-%m', date) = $1 AND category1 = $2 AND type = $3 GROUP BY category2 ORDER BY amount DESC",
+    [month, cat1, type]
   );
 }
 
-export async function getStatsSubCategoriesRange(start: string, end: string, cat1: string): Promise<CatStat[]> {
+export async function getStatsSubCategoriesRange(start: string, end: string, cat1: string, type: TxType = 'expense'): Promise<CatStat[]> {
   const database = await initDatabase();
   return database.select<CatStat[]>(
-    'SELECT category2 as category, SUM(amount) as amount, COUNT(*) as count FROM expenses WHERE date >= $1 AND date <= $2 AND category1 = $3 GROUP BY category2 ORDER BY amount DESC',
-    [start, end, cat1]
+    'SELECT category2 as category, SUM(amount) as amount, COUNT(*) as count FROM expenses WHERE date >= $1 AND date <= $2 AND category1 = $3 AND type = $4 GROUP BY category2 ORDER BY amount DESC',
+    [start, end, cat1, type]
   );
 }
 
-export async function getStatsTrendRange(start: string, end: string, mode: 'day' | 'month'): Promise<TrendPoint[]> {
+export async function getStatsTrendRange(start: string, end: string, mode: 'day' | 'month', type: TxType = 'expense'): Promise<TrendPoint[]> {
   const database = await initDatabase();
   if (mode === 'month') {
     return database.select<TrendPoint[]>(
-      "SELECT strftime('%Y-%m', date) as date, SUM(amount) as amount FROM expenses WHERE date >= $1 AND date <= $2 GROUP BY strftime('%Y-%m', date) ORDER BY date",
-      [start, end]
+      "SELECT strftime('%Y-%m', date) as date, SUM(amount) as amount FROM expenses WHERE date >= $1 AND date <= $2 AND type = $3 GROUP BY strftime('%Y-%m', date) ORDER BY date",
+      [start, end, type]
     );
   }
   return database.select<TrendPoint[]>(
-    'SELECT date, SUM(amount) as amount FROM expenses WHERE date >= $1 AND date <= $2 GROUP BY date ORDER BY date',
-    [start, end]
+    'SELECT date, SUM(amount) as amount FROM expenses WHERE date >= $1 AND date <= $2 AND type = $3 GROUP BY date ORDER BY date',
+    [start, end, type]
   );
 }

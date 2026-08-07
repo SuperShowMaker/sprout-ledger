@@ -9,8 +9,9 @@ import dayjs, { Dayjs } from 'dayjs';
 import weekOfYear from 'dayjs/plugin/weekOfYear';
 dayjs.extend(weekOfYear);
 import { useI18n } from '../i18n/I18nContext';
-import { translateCategory } from '../i18n/categoryTranslations';
 import { getAllExpensesForExport, batchAddExpenses, getCategories, clearAllExpenses, Expense } from '../db';
+import { buildExportRow, parseImportCsv } from '../csv';
+import { incomeCat1Names } from '../data/categories';
 import { useData } from '../DataContext';
 import CategoryManager from './CategoryManager';
 import { isDebugMode, setDebugMode as _setDebugMode } from '../debug';
@@ -78,9 +79,7 @@ export default function Profile() {
       if (data.length === 0) { message.warning(t('list.noData')); return; }
       const BOM = '﻿';
       const header = t('export.csvHeader') + '\n';
-      const rows = data.map(d =>
-        `${d.date},${translateCategory(lang, d.category1)},${translateCategory(lang, d.category2)},${d.amount.toFixed(2)},${(d.note || '').replace(/,/g, '，')},\t${d.created_at || ''}`
-      ).join('\n');
+      const rows = data.map(d => buildExportRow(d, lang)).join('\n');
       const csv = BOM + header + rows;
       const now = new Date();
       const defaultName = `${t('export.filePrefix')}${suffix}_${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}.csv`;
@@ -106,26 +105,16 @@ export default function Profile() {
       if (content.length > 10 * 1024 * 1024) throw new Error(lang === 'zh' ? '文件过大（上限10MB）' : 'File too large (max 10MB)');
       const lines = content.trim().split('\n').map(l => l.trim()).filter(Boolean);
       if (lines.length < 2) throw new Error(t('import.emptyFile'));
-      const headerCols = lines[0].replace(/^﻿/, '').split(',').map(h => h.trim());
-      if (![['日期','一级分类','二级分类','金额','备注','记录时间'],['Date','Category1','Category2','Amount','Note','CreatedAt']]
-        .some(eh => eh.every(col => headerCols.some(h => h.toLowerCase() === col.toLowerCase())))) {
-        throw new Error(lang === 'zh' ? '仅支持青禾6列CSV格式' : 'Only 6-column Sprout CSV format supported');
-      }
       const allCats = await getCategories();
-      const cat1Set = new Set(allCats.map(c => c.name));
+      // 校验集合：DB 支出分类 + 收入预设分类（收入记录导入也能通过分类校验）
+      const cat1Set = new Set(allCats.map(c => c.name).concat(incomeCat1Names));
       const cat2Map: Record<string, Set<string>> = {};
       allCats.forEach(c => { cat2Map[c.name] = new Set(c.children); });
+      const { headerInvalid, parsed, errors } = parseImportCsv(content, { cat1Set, cat2Map });
+      if (headerInvalid) throw new Error(lang === 'zh' ? '仅支持青禾6/7列CSV格式' : 'Only 6/7-column Sprout CSV format supported');
       const errKey = lang === 'zh' ? '格式不符' : 'Invalid rows';
       const errorCats: Record<string, number> = {};
-      const parsed: Expense[] = [];
-      for (let i = 1; i < lines.length; i++) {
-        const c = lines[i].split(',').map(x => x.trim());
-        const amount = parseFloat(c[3] || '');
-        if (c.length < 4 || !/^\d{4}-\d{2}-\d{2}$/.test(c[0] || '') || isNaN(amount) || amount <= 0 || !c[1] || !(c[5] || '').trim() || !cat1Set.has(c[1]) || (c[2] && cat2Map[c[1]] && !cat2Map[c[1]].has(c[2]))) {
-          errorCats[errKey] = (errorCats[errKey] || 0) + 1; continue;
-        }
-        parsed.push({ amount, category1: c[1], category2: c[2] || '', date: c[0], note: c[4] || '', created_at: c[5]?.trim() || undefined });
-      }
+      if (errors.length > 0) errorCats[errKey] = errors.length;
       const existingTs = new Set<string>();
       try { const all = await getAllExpensesForExport(); all.forEach(e => { if (e.created_at) existingTs.add(e.created_at); }); } catch {}
       const seen = new Set<string>();
@@ -167,7 +156,7 @@ export default function Profile() {
     { key: 'import', icon: <UploadOutlined />, label: (<div className="profile-row" onClick={handleImport}><span>{lang === 'zh' ? '导入数据' : 'Import Data'}</span><span style={{ color: '#bbb' }}>›</span></div>), },
     { key: 'categories', icon: <SettingOutlined />, label: (<div className="profile-row" onClick={() => setCatManagerOpen(true)}><span>{t('form.manageCategory')}</span><span style={{ color: '#bbb' }}>›</span></div>), },
     ...(_debugOn ? [{ key: 'clearData', icon: <span style={{ fontSize: 18 }}>🗑️</span>, label: (<div className="profile-row" onClick={() => { modal.confirm({ title: lang === 'zh' ? '清空全部数据' : 'Clear All Data', content: lang === 'zh' ? '此操作不可撤销，确定清空所有账单记录？' : 'This cannot be undone. Clear all expenses?', okText: lang === 'zh' ? '清空' : 'Clear', okType: 'danger', cancelText: t('list.cancel'), onOk: async () => { await clearAllExpenses(); message.success(lang === 'zh' ? '已清空' : 'Cleared'); }, }); }}><span style={{ color: '#ff4d4f' }}>{lang === 'zh' ? '清空全部数据' : 'Clear All Data'}</span></div>), }] : []),
-    { key: 'about', icon: <InfoCircleOutlined />, label: (<div className="profile-row" onClick={() => setAboutVisible(true)}><span>{lang === 'zh' ? '关于青禾记账' : 'About'}</span><span style={{ color: '#999', fontSize: 13 }}>v1.1.0</span></div>), },
+    { key: 'about', icon: <InfoCircleOutlined />, label: (<div className="profile-row" onClick={() => setAboutVisible(true)}><span>{lang === 'zh' ? '关于青禾记账' : 'About'}</span><span style={{ color: '#999', fontSize: 13 }}>v1.2.0</span></div>), },
   ];
 
   return (
@@ -249,7 +238,7 @@ export default function Profile() {
         <div style={{ textAlign: 'center', padding: '12px 0 4px' }}>
           <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'linear-gradient(135deg, #f6ffed, #d9f7be)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', fontSize: 32 }}>{'🌱'}</div>
           <h2 style={{ margin: '0 0 4px', fontSize: 20, fontWeight: 700, color: '#333' }}>{t('app.title')}</h2>
-          <p style={{ margin: '0 0 16px', fontSize: 13, color: '#52c41a', fontWeight: 500 }}>v1.1.0</p>
+          <p style={{ margin: '0 0 16px', fontSize: 13, color: '#52c41a', fontWeight: 500 }}>v1.2.0</p>
           <p style={{ margin: 0, fontSize: 13, color: '#888', lineHeight: 1.8 }}>{lang === 'zh' ? '简洁高效的个人记账工具\n本地存储 · 无需联网 · 数据安全' : 'Simple, efficient expense tracker.\nLocal storage · Offline · Private.'}</p>
           <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #f0f0f0', fontSize: 11, color: '#bbb' }}>Tauri 2 · React 19 · SQLite<br />{'©'} 2026 Sprout Ledger</div>
         </div>

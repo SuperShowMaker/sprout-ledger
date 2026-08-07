@@ -5,10 +5,10 @@
 ```bash
 npm run tauri dev              # 桌面端
 npm run tauri android dev      # 手机端
-npm test                       # 124 个测试用例
+npm test                       # 167 个测试用例
 ```
 
-个人轻量支出记账，Windows + Android，本地 SQLite，无需联网。
+个人轻量收支记账，Windows + Android，本地 SQLite，无需联网。
 完整功能清单与决策台账见 `PRD.md`，分类体系见 `分类.md`。
 
 ## 技术栈
@@ -34,8 +34,10 @@ src/
 ├── db.ts               # SQLite 操作（并发锁 initPromise）
 ├── calculator.ts       # 计算器纯逻辑：表达式求值（收口两位小数）+ 小数点校验
 ├── holdRepeat.ts       # 长按连删定时器（纯逻辑，可独立测试）
+├── csv.ts              # CSV 导出/导入纯逻辑（7列收支格式 + 6列兼容 + 类型归一化）
+├── format.ts           # 金额展示纯逻辑（±前缀/日合计拆分/结余）
 ├── components/
-│   ├── RecordFlow      # 记账全屏向导（FAB 触发）
+│   ├── RecordFlow      # 记账全屏向导（FAB 触发，支出/收入切换）
 │   ├── ExpenseList     # 日历 + 清单 + 编辑弹窗
 │   ├── MonthlyStats    # 周/月/年 + 饼图 + 柱状趋势 + 折叠列表
 │   ├── BudgetPage      # 预算（总预算为主 + 分类从总分配 + 预算执行）
@@ -72,6 +74,8 @@ src-tauri/
 
 ### 数据
 - `initDatabase()` 已做并发锁，直接 `await initDatabase()` 即可
+- 交易方向靠 `expenses.type`（`'expense'`/`'income'`），金额恒为正，聚合查询默认过滤 `type='expense'`
+- 收入分类是**前端常量** `incomeCategories`（7 预设，不入 `categories1` 表，不可在分类管理里增删）；CSV 导入校验需额外并入 `incomeCat1Names`
 - 预设分类判断：`defaultCat1Names.includes()` / `defaultCat2Names.includes()`
 - 空小类：明细显示大类名兜底，统计折叠显示"未分类"
 - 导入架构：`useReducer` 状态机（idle → importing → done），零 ref、零 setTimeout
