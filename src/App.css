@@ -504,6 +504,7 @@ body {
   transition: background-color 0.1s ease;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
+  touch-action: manipulation; /* 长按退格时避免触发缩放/滚动 */
 }
 
 /* 数字键 */

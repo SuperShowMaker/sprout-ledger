@@ -3,6 +3,8 @@ import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { DatePicker, Input, message } from 'antd';
 import dayjs, { Dayjs } from 'dayjs';
 import { useI18n } from '../i18n/I18nContext';
+import { evaluate, canAppendDot, isOperator } from '../calculator';
+import { createHoldRepeater, type HoldRepeater } from '../holdRepeat';
 
 interface Props {
   visible: boolean;
@@ -28,41 +30,18 @@ interface Props {
   onDateChange?: (d: Dayjs) => void;
 }
 
-// 安全求值："15+8-3" → 20。只用 + -，左到右。
-function evaluate(expr: string): number | null {
-  if (!expr) return null;
-  // 去掉末尾的运算符
-  const cleaned = expr.replace(/[+\-]+$/, '');
-  if (!cleaned) return null;
-  // tokenize：数字段 | 运算符
-  const tokens = cleaned.match(/(\d+\.?\d*)|[+\-]/g);
-  if (!tokens) return null;
-  let result = parseFloat(tokens[0]);
-  for (let i = 1; i < tokens.length; i += 2) {
-    const op = tokens[i];
-    const num = parseFloat(tokens[i + 1]);
-    if (isNaN(num)) break;
-    if (op === '+') result += num;
-    else if (op === '-') result -= num;
-  }
-  return result;
-}
-
-function canAppendDot(expr: string): boolean {
-  // 最后一个数字段是否已经包含小数点
-  const lastNum = expr.split(/[+\-]/).pop() || '';
-  return !lastNum.includes('.');
-}
-
-function isOperator(char: string): boolean {
-  return char === '+' || char === '-';
-}
-
 export default function CalculatorInput({ visible, initialValue, onConfirm, onCancel, embedded, label, title, subtitle, max, onClear, note, date, onNoteChange, onDateChange }: Props) {
   const { t } = useI18n();
   const [expr, setExpr] = useState('');
   // 超限提示节流：避免连按超限数字时每次按键都重置 toast 计时器导致长时间停留
   const lastMaxToast = useRef(0);
+
+  // 按键震动（仅移动端支持时生效，桌面端自动跳过）
+  const vibrate = useCallback(() => {
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      try { navigator.vibrate(10); } catch { /* 不支持的环境忽略 */ }
+    }
+  }, []);
 
   useEffect(() => {
     if (visible) {
@@ -106,6 +85,34 @@ export default function CalculatorInput({ visible, initialValue, onConfirm, onCa
     setExpr((prev) => prev.slice(0, -1));
   }, []);
 
+  // 长按退格连删：按下立即删一个，300ms 后以 50ms 间隔连删，松开/移出/取消或卸载时停止
+  const holdRepeatRef = useRef<HoldRepeater | null>(null);
+  if (holdRepeatRef.current === null) {
+    holdRepeatRef.current = createHoldRepeater({
+      delay: 300,
+      interval: 50,
+      onTick: () => { backspace(); vibrate(); },
+    });
+  }
+
+  const stopHoldRepeat = useCallback(() => {
+    holdRepeatRef.current?.stop();
+  }, []);
+
+  // 组件卸载时兜底清理
+  useEffect(() => () => holdRepeatRef.current?.stop(), []);
+
+  // preventDefault 抑制长按触发的系统文本选择/上下文菜单
+  const handleBackspacePointerDown = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    holdRepeatRef.current?.start();
+  }, []);
+
+  const handleKeyClick = useCallback((action: () => void) => () => {
+    vibrate();
+    action();
+  }, [vibrate]);
+
   const clear = useCallback(() => {
     setExpr('');
   }, []);
@@ -129,7 +136,18 @@ export default function CalculatorInput({ visible, initialValue, onConfirm, onCa
 
   const isRecordMode = note !== undefined && onNoteChange !== undefined && onDateChange !== undefined;
 
-  const keys: { label: string; action: () => void; className: string }[] = [
+  interface KeySpec {
+    label: string;
+    className: string;
+    action?: () => void;
+    onPointerDown?: (e: React.PointerEvent<HTMLButtonElement>) => void;
+    onPointerUp?: () => void;
+    onPointerLeave?: () => void;
+    onPointerCancel?: () => void;
+    onContextMenu?: (e: React.MouseEvent<HTMLButtonElement>) => void;
+  }
+
+  const keys: KeySpec[] = [
     { label: '7', action: () => append('7'), className: 'key-num' },
     { label: '8', action: () => append('8'), className: 'key-num' },
     { label: '9', action: () => append('9'), className: 'key-num' },
@@ -144,7 +162,15 @@ export default function CalculatorInput({ visible, initialValue, onConfirm, onCa
     { label: '−', action: () => append('-'), className: 'key-op key-sub' },
     { label: '.', action: () => append('.'), className: 'key-num' },
     { label: '0', action: () => append('0'), className: 'key-num' },
-    { label: '⌫', action: backspace, className: 'key-fn' },
+    {
+      label: '⌫',
+      className: 'key-fn',
+      onPointerDown: handleBackspacePointerDown,
+      onPointerUp: stopHoldRepeat,
+      onPointerLeave: stopHoldRepeat,
+      onPointerCancel: stopHoldRepeat,
+      onContextMenu: (e) => e.preventDefault(),
+    },
     { label: '✓', action: handleConfirm, className: 'key-confirm' },
   ];
 
@@ -186,7 +212,12 @@ export default function CalculatorInput({ visible, initialValue, onConfirm, onCa
         <button
           key={k.label}
           className={`calc-key ${k.className}`}
-          onClick={k.action}
+          onClick={k.action ? handleKeyClick(k.action) : undefined}
+          onPointerDown={k.onPointerDown}
+          onPointerUp={k.onPointerUp}
+          onPointerLeave={k.onPointerLeave}
+          onPointerCancel={k.onPointerCancel}
+          onContextMenu={k.onContextMenu}
           type="button"
         >
           {k.label}

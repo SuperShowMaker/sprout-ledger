@@ -5,7 +5,7 @@
 ```bash
 npm run tauri dev              # 桌面端
 npm run tauri android dev      # 手机端
-npm test                       # 84 个测试用例
+npm test                       # 124 个测试用例
 ```
 
 个人轻量支出记账，Windows + Android，本地 SQLite，无需联网。
@@ -32,6 +32,8 @@ src/
 ├── App.tsx             # 入口：初始化 DB → 底部导航（4标签 + 中央记账FAB）
 ├── App.css             # 全局样式 + 深色模式变量
 ├── db.ts               # SQLite 操作（并发锁 initPromise）
+├── calculator.ts       # 计算器纯逻辑：表达式求值（收口两位小数）+ 小数点校验
+├── holdRepeat.ts       # 长按连删定时器（纯逻辑，可独立测试）
 ├── components/
 │   ├── RecordFlow      # 记账全屏向导（FAB 触发）
 │   ├── ExpenseList     # 日历 + 清单 + 编辑弹窗

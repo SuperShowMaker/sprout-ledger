@@ -43,6 +43,7 @@
 | 30 | 08-03 | 点击反馈 | 消除蓝色 tap-highlight 方块，统一 :active 灰底叠加（微信风格），antd 水波纹改为品牌绿 |
 | 31 | 08-03 | 金额输入 | 自定义计算器键盘替换系统键盘，支持加减法表达式实时求值 |
 | 32 | 08-03 | 收入功能 | 推翻 #15，增加收入记录与收支统计，expenses 表加 type 字段区分支出/收入 |
+| 33 | 08-07 | 金额精度 | 计算器 evaluate 结果收口两位小数（`Number(result.toFixed(2))`），避免 `0.1+0.2` 存浮点渣，与显示端 toFixed(2) 口径一致 |
 
 ## 功能清单
 
@@ -66,16 +67,16 @@
 
 ---
 
-### Phase 0 —— 基础修复（P0，本周可完成）
+### Phase 0 —— 基础修复（P0）✅ 已落地（4/4）
 
 > 目的：恢复测试能力，消除已知体验问题，为后续开发铺路。
 
-| # | 任务 | 复杂度 | 层 | 说明 |
-|---|------|:--:|:--:|------|
-| 0.1 | **修复测试套件** | S | F | 84 个用例因 `@testing-library/jest-dom` 与 vitest 兼容性问题全挂。升级 jest-dom 或改用 vitest 原生断言 |
-| 0.2 | **CalculatorInput 纯函数测试** | S | F | `evaluate()` 和 `canAppendDot()` 是纯函数，加 15-20 个用例覆盖所有边界，零成本 |
-| 0.3 | **计算器长按退格连删** | S | F | ⌫ 键绑定 `onPointerDown`/`onPointerUp` + `setInterval`，长按 300ms 后连续删除，松手停止 |
-| 0.4 | **Android 键盘震动反馈** | S | F | 按键时 `navigator.vibrate(10)`，轻短震动。用 `!!navigator.vibrate` 做能力检测，桌面端自动跳过 |
+| # | 任务 | 状态 | 说明（实际实现） |
+|---|------|:--:|------|
+| 0.1 | **修复测试套件** | ✅ | 升级 `@testing-library/jest-dom` v7 + vitest v4 后 84 用例恢复全绿（实际落地，PRD 曾标 0%） |
+| 0.2 | **CalculatorInput 纯函数测试** | ✅ | 抽 `src/calculator.ts` 纯模块（evaluate/canAppendDot/isOperator），30 用例覆盖基本/边界/浮点精度；**顺带修复**：evaluate 结果收口两位小数，避免 `0.1+0.2` 存成 `0.30000000000000004`（与显示端 `toFixed(2)` 一致） |
+| 0.3 | **计算器长按退格连删** | ✅ | ⌫ 键 `onPointerDown` 立即删一个 → 300ms 后 50ms 间隔连删，`onPointerUp/Leave/Cancel` + 卸载清理。连删定时器抽 `src/holdRepeat.ts` 纯模块 + 5 用例；`.calc-key` 加 `touch-action: manipulation` 防长按缩放 |
+| 0.4 | **Android 键盘震动反馈** | ✅ | 按键 `navigator.vibrate(10)`，`'vibrate' in navigator` 能力检测，桌面端自动跳过 |
 
 ---
 
@@ -170,7 +171,7 @@
 ### 进度总览
 
 ```
-Phase 0  ░░░░░░░░░░  0%  基础修复
+Phase 0  ██████████  100%  基础修复
 Phase 1  ░░░░░░░░░░  0%  搜索与筛选
 Phase 2  ░░░░░░░░░░  0%  收入功能
 Phase 3  ██████░░░░  60%  预算管理
