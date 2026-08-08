@@ -1,15 +1,17 @@
 # Sprout（青禾记账）
 
+> 事实源约定：架构 / 约束 / 已拍板决策以本文件为准，冲突时以代码实现为准；近期变更动态见 `.workbuddy/memory/`（每日日志），稳定后回写本文件。
+
 ## 速览
 
 ```bash
 npm run tauri dev              # 桌面端
 npm run tauri android dev      # 手机端
-npm test                       # 167 个测试用例
+npm test                       # 188 个测试用例
 ```
 
 个人轻量收支记账，Windows + Android，本地 SQLite，无需联网。
-完整功能清单与决策台账见 `PRD.md`，分类体系见 `分类.md`。
+完整功能清单与决策台账见 `PRD.md`，类别体系见 `分类.md`。
 
 ## 技术栈
 
@@ -41,15 +43,15 @@ src/
 │   ├── ExpenseList     # 日历 + 清单 + 编辑弹窗
 │   ├── MonthlyStats    # 周/月/年 + 饼图 + 柱状趋势 + 折叠列表
 │   ├── BudgetPage      # 预算（总预算为主 + 分类从总分配 + 预算执行）
-│   ├── Profile         # 语言/深色/导出/导入/分类管理
-│   ├── CategoryManager # 预设锁定 + 自定义增删
+│   ├── Profile         # 语言/深色/导出/导入/类别管理
+│   ├── CategoryManager # 网格两段式：一级网格+子类pill区；🔒/✕角标；pointer 拖拽排序（按住即拖）；子类内联添加
 │   └── CalculatorInput # 自定义计算器键盘（加减法 + 表达式求值）
 ├── i18n/
 │   ├── I18nContext     # useI18n()：多语言 + 深色模式
 │   ├── translations    # UI 文案中英对照
-│   └── categoryTranslations # 分类名称翻译
+│   └── categoryTranslations # 类别名称翻译
 ├── data/
-│   └── categories      # 默认分类 + 锁定名单
+│   └── categories      # 默认类别 + 锁定名单
 └── test/               # 纯函数测试
 src-tauri/
 ├── tauri.conf.json     # 窗口 430×800，宽度锁定
@@ -70,18 +72,18 @@ src-tauri/
 - 所有可交互元素消除 `-webkit-tap-highlight-color`，统一用 `:active` 灰底叠加做点击反馈
 - 弹窗用 `App.useApp().modal`，不用静态 `Modal.confirm`（后者不吃主题）
 - 不依赖 antd 内部类名（v6 CSS-in-JS，类名动态哈希），自绘组件
-- 按钮禁用 → **隐藏**，不是置灰（预设分类直接不渲染编辑/删除按钮）
+- 按钮禁用 → **隐藏**，不是置灰（预设类别直接不渲染删除入口，仅显示 🔒 角标）
 
 ### 数据
 - `initDatabase()` 已做并发锁，直接 `await initDatabase()` 即可
 - 交易方向靠 `expenses.type`（`'expense'`/`'income'`），金额恒为正，聚合查询默认过滤 `type='expense'`
-- 收入分类是**前端常量** `incomeCategories`（7 预设，不入 `categories1` 表，不可在分类管理里增删）；CSV 导入校验需额外并入 `incomeCat1Names`
-- 预设分类判断：`defaultCat1Names.includes()` / `defaultCat2Names.includes()`
-- 空小类：明细显示大类名兜底，统计折叠显示"未分类"
+- 收入分类已入库：`categories1` 表按 `type`（`'expense'`/`'income'`）区分，7 个收入预设 `INSERT OR IGNORE` 入库（sort_order 100 起，幂等迁移），收入无子类；`incomeCategories` 前端常量保留作种子与锁定名单 `incomeCat1Names`，CSV 导入校验需额外并入；类别管理里收入自定义项可增删，预设项锁定（显示 🔒 角标）
+- 预设分类判断：`defaultCat1Names.includes()`；**cat2 按「父类 + 名字」查 `defaultCategories`**（避免自定义父类下与预设子类重名的分类被误锁）
+- 空小类：明细显示大类名兜底，统计折叠显示"未归类"
 - 导入架构：`useReducer` 状态机（idle → importing → done），零 ref、零 setTimeout
 - 导入去重：仅按 `created_at`（毫秒级），不做数据内容比对
 - 数据库位置：Windows `%APPDATA%/com.qinghe.ledger/` · Android App 内部存储
-- 分类变更改 `categories.ts` 后需删旧数据库（开发阶段无历史负担）
+- 表结构变更走幂等 ALTER 迁移（如 `PRAGMA table_info` 检查后补列），已入库用户无需删库；新建库的 CREATE 已含新列
 
 ## 开发与沟通
 

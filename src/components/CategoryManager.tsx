@@ -1,20 +1,21 @@
-// 青禾记账 - 分类管理
-import { useEffect, useState } from 'react';
-import { Modal, Button, Input, List, message, Space, Collapse } from 'antd';
-import { PlusOutlined, DeleteOutlined, EditOutlined, SettingOutlined } from '@ant-design/icons';
+// 青禾记账 - 分类管理（参考「记一笔」网格：一级网格 + 点选后子类 pill 区；角标锁/红✕；长按拖拽排序）
+import { useEffect, useRef, useState } from 'react';
+import { Input, message } from 'antd';
+import { LeftOutlined, PlusOutlined, CloseOutlined, LockOutlined, DeleteOutlined } from '@ant-design/icons';
 import {
   getCategories,
   addCategory1,
   addCategory2,
   deleteCategory1,
   deleteCategory2,
-  renameCategory1,
-  renameCategory2,
+  updateCategory1Sort,
+  updateCategory2Sort,
   countExpensesByCategory,
+  TxType,
 } from '../db';
 import { useI18n } from '../i18n/I18nContext';
 import { translateCategory } from '../i18n/categoryTranslations';
-import { defaultCat1Names, defaultCat2Names } from '../data/categories';
+import { defaultCat1Names, defaultCategories, incomeCat1Names } from '../data/categories';
 import { useBackBlock } from '../useBackBlock';
 
 interface Props {
@@ -23,355 +24,462 @@ interface Props {
   onChanged: () => void;
 }
 
-const EMOJI_LIST = ['🍜', '🚗', '🛒', '🏠', '💊', '📚', '🎮', '🎁', '📱', '📦', '💻', '👶', '🐱', '🌿', '🎵', '✈️', '☕', '💡'];
+type CatKind = 'cat1' | 'cat2' | 'income';
+
+type SheetState =
+  | { mode: 'confirm-delete'; kind: CatKind; name: string; parent?: string; count: number }
+  | { mode: 'add'; kind: CatKind }
+  | null;
+
+interface Cat1 { name: string; icon: string; children: string[] }
+
+// 拖拽中的项（区分层级：一级 / 子类 / 收入）
+interface DragState { kind: CatKind; name: string; parent?: string }
+
+// emoji 语义分组：支出 / 收入各一套（添加面板用，含自定义扩充）
+const EMOJI_GROUPS: { zh: string; en: string; icons: string[] }[] = [
+  { zh: '饮食', en: 'Food', icons: ['🍜', '🍚', '🍰', '🍎', '🍺', '☕', '🥤', '🍖', '🍔', '🍟', '🍣', '🥟', '🍲', '🧋'] },
+  { zh: '交通', en: 'Transport', icons: ['🚗', '🚌', '🚇', '✈️', '🚕', '⛽', '🚲', '🚄', '🚢', '🛵', '🚚'] },
+  { zh: '购物', en: 'Shopping', icons: ['🛒', '👗', '💄', '📱', '🎁', '🧴', '💍', '👜', '👠', '🧥', '⌚'] },
+  { zh: '居家', en: 'Home', icons: ['🏠', '🛋', '💡', '🔧', '🧹', '🐱', '🪴', '🛏', '🚿', '🪑', '📺', '🧺'] },
+  { zh: '娱乐', en: 'Leisure', icons: ['🎮', '🎬', '🎵', '🏸', '⚽', '🎨', '📚', '🎳', '🎯', '🎤', '🎪', '🧗'] },
+  { zh: '健康', en: 'Health', icons: ['💊', '🏥', '💉', '🦷', '🏋', '🧘', '🧑‍⚕️', '🦺', '😷', '💪'] },
+  { zh: '其他', en: 'Others', icons: ['🧾', '🔋', '📷', '🖥', '🎸', '🃏', '🍼', '🧸'] },
+];
+const INCOME_EMOJI_GROUPS: { zh: string; en: string; icons: string[] }[] = [
+  { zh: '收入', en: 'Income', icons: ['💰', '💳', '🏦', '📈', '🧧', '🪙', '💻', '🎓', '🎁', '🎟', '💎', '🏅', '🛍'] },
+];
 
 export default function CategoryManager({ open, onClose, onChanged }: Props) {
   const { t, lang } = useI18n();
-  const [categories, setCategories] = useState<{ name: string; icon: string; children: string[] }[]>([]);
-  const [newCat1, setNewCat1] = useState('');
-  const [newCat1Icon, setNewCat1Icon] = useState('📦');
-  const [newCat2Parent, setNewCat2Parent] = useState('');
-  const [newCat2Name, setNewCat2Name] = useState('');
-  const [editingCat1, setEditingCat1] = useState('');
-  const [editingCat1NewName, setEditingCat1NewName] = useState('');
-  const [editingCat2, setEditingCat2] = useState<{ name: string; parent: string } | null>(null);
-  const [editingCat2NewName, setEditingCat2NewName] = useState('');
+  const [tab, setTab] = useState<TxType>('expense');
+  const [expenseCats, setExpenseCats] = useState<Cat1[]>([]);
+  const [incomeCats, setIncomeCats] = useState<Cat1[]>([]);
+  const [selectedCat1, setSelectedCat1] = useState<string | null>(null);
+  const [sheet, setSheet] = useState<SheetState>(null);
+  const [inputValue, setInputValue] = useState('');
+  const [inputIcon, setInputIcon] = useState('📦');
+  const [inputError, setInputError] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
-  const isDefaultCat1 = (name: string) => defaultCat1Names.includes(name);
-  const isDefaultCat2 = (name: string) => defaultCat2Names.includes(name);
+  // 子类别内联添加（不跳页，原页面输入）
+  const [inlineAdd, setInlineAdd] = useState(false);
+  const [inlineValue, setInlineValue] = useState('');
+  const [inlineError, setInlineError] = useState('');
 
-  interface ConfirmAction {
-    title: string;
-    content: string;
-    okText: string;
-    onOk: () => Promise<void>;
-  }
-  const [confirm, setConfirm] = useState<ConfirmAction | null>(null);
+  // 拖拽排序状态（pointer 自定义拖拽：绕过 HTML5 DnD，WebView 兼容）
+  // dragRef/dropTargetRef 供事件回调同步读取（pointermove/up 紧跟状态变化，避免 React state 异步读到旧值）
+  const [dragName, setDragName] = useState<string | null>(null);     // 渲染：被拖项
+  const [dropTarget, setDropTarget] = useState<{ name: string; parent?: string; position: 'before' | 'after' } | null>(null);
+  const dragRef = useRef<DragState | null>(null);
+  const dropTargetRef = useRef<typeof dropTarget>(null);
+  const draggingRef = useRef(false);
+  const startPosRef = useRef<{ x: number; y: number } | null>(null);
+
+  // 锁定判断：cat2 按「父类 + 名字」查预设子类，避免自定义父类下与预设子类重名的分类被误锁
+  const isLocked = (kind: CatKind, name: string, parent?: string) =>
+    kind === 'cat1' ? defaultCat1Names.includes(name)
+    : kind === 'cat2' ? (defaultCategories.find((c) => c.name === parent)?.children.includes(name) ?? false)
+    : incomeCat1Names.includes(name);
 
   const load = async () => {
-    const cats = await getCategories();
-    setCategories(cats);
+    const [exp, inc] = await Promise.all([getCategories('expense'), getCategories('income')]);
+    setExpenseCats(exp);
+    setIncomeCats(inc);
   };
 
   useEffect(() => {
-    if (open) load();
+    if (open) { load(); setTab('expense'); setSelectedCat1(null); setSheet(null); resetDrag(); }
   }, [open]);
 
-  useBackBlock(open, onClose);
+  // 返回键：优先关面板/确认视图，其次退出页面
+  useBackBlock(open, () => { if (sheet) setSheet(null); else onClose(); });
 
-  const handleAddCat1 = async () => {
-    if (!newCat1.trim()) return;
-    if (categories.find((c) => c.name === newCat1.trim())) {
-      message.warning(t('cat.nameExists'));
-      return;
-    }
-    await addCategory1(newCat1.trim(), newCat1Icon);
+  if (!open) return null;
+
+  const currentCats = tab === 'expense' ? expenseCats : incomeCats;
+  const selectedCat = tab === 'expense' ? expenseCats.find((c) => c.name === selectedCat1) ?? null : null;
+
+  // ============ 添加（全屏面板：仅一级/收入；子类别走内联） ============
+  const openAdd = (kind: CatKind) => {
+    setInputValue('');
+    setInputError('');
+    // 图标沿用上次选择（会话内），避免连续添加全是默认 📦
+    setSheet({ mode: 'add', kind });
+  };
+
+  const submitAdd = async () => {
+    if (!sheet || sheet.mode !== 'add') return;
+    const name = inputValue.trim();
+    if (!name) return;
+    const list = currentCats.map((c) => c.name);
+    if (list.includes(name)) { setInputError(t('cat.nameExists')); return; }
+    await addCategory1(name, inputIcon, sheet.kind === 'income' ? 'income' : 'expense');
     message.success(t('cat.added'));
-    setNewCat1('');
-    setNewCat1Icon('📦');
+    setSheet(null);
     await load();
     onChanged();
   };
 
-  const handleAddCat2 = async () => {
-    if (!newCat2Parent || !newCat2Name.trim()) return;
-    const parent = categories.find((c) => c.name === newCat2Parent);
-    if (parent?.children.find((c) => c === newCat2Name.trim())) {
-      message.warning(t('cat.subExists'));
-      return;
-    }
-    await addCategory2(newCat2Name.trim(), newCat2Parent);
+  // 子类别内联添加：提交后收起输入行
+  const submitInline = async () => {
+    if (!selectedCat1 || !selectedCat) return;
+    const name = inlineValue.trim();
+    if (!name) return;
+    if (selectedCat.children.includes(name)) { setInlineError(t('cat.subExists')); return; }
+    await addCategory2(name, selectedCat1);
     message.success(t('cat.added'));
-    setNewCat2Name('');
-    setNewCat2Parent('');
+    setInlineValue('');
+    setInlineError('');
+    setInlineAdd(false);
     await load();
     onChanged();
   };
 
-  const handleDeleteCat1 = async (name: string) => {
-    const count = await countExpensesByCategory(name);
-    if (count > 0) {
-      setConfirm({
-        title: t('cat.deleteTitle'),
-        content: t('cat.deleteContent', { count }),
-        okText: t('cat.keepDelete'),
-        onOk: async () => {
-          await deleteCategory1(name);
-          message.success(t('cat.deletedWithRecords'));
-          await load();
-          onChanged();
-        },
-      });
-    } else {
-      setConfirm({
-        title: t('cat.deleteSimpleTitle'),
-        content: t('cat.deleteSimpleContent'),
-        okText: t('cat.delete'),
-        onOk: async () => {
-          await deleteCategory1(name);
-          message.success(t('cat.deleted'));
-          await load();
-          onChanged();
-        },
-      });
-    }
+  const openInline = () => {
+    setInlineValue('');
+    setInlineError('');
+    setInlineAdd(true);
   };
 
-  const handleDeleteCat2 = async (name: string, parent: string) => {
+  // ============ 删除（面板内两步确认） ============
+  const requestDelete = async (kind: CatKind, name: string, parent?: string) => {
+    const count = await countExpensesByCategory(kind === 'cat2' ? parent! : name, kind === 'cat2' ? name : undefined);
+    setSheet({ mode: 'confirm-delete', kind, name, parent, count });
+  };
+
+  const executeDelete = async () => {
+    if (!sheet || sheet.mode !== 'confirm-delete' || deleting) return;
+    setDeleting(true);
     try {
-      const count = await countExpensesByCategory(parent, name);
-      if (count > 0) {
-        setConfirm({
-          title: t('cat.deleteTitle'),
-          content: t('cat.deleteSubContent', { count }),
-          okText: t('cat.keepDelete'),
-          onOk: async () => {
-            await deleteCategory2(name, parent);
-            message.success(t('cat.deletedWithRecords'));
-            await load();
-            onChanged();
-          },
-        });
-      } else {
-        setConfirm({
-          title: t('cat.deleteSimpleTitle'),
-          content: t('cat.deleteSimpleContent'),
-          okText: t('cat.keepDelete'),
-          onOk: async () => {
-            await deleteCategory2(name, parent);
-            message.success(t('cat.deleted'));
-            await load();
-            onChanged();
-          },
-        });
-      }
+      if (sheet.kind === 'cat2') await deleteCategory2(sheet.name, sheet.parent!);
+      else await deleteCategory1(sheet.name);
+      message.success(t(sheet.count > 0 ? 'cat.deletedWithRecords' : 'cat.deleted'));
+      setSheet(null);
+      await load();
+      onChanged();
     } catch (err) {
       message.error(`${lang === 'zh' ? '删除失败' : 'Delete failed'}: ${String(err)}`);
+    } finally {
+      setDeleting(false);
     }
   };
 
-  const handleRenameCat1 = async () => {
-    if (!editingCat1NewName.trim() || editingCat1NewName.trim() === editingCat1) {
-      setEditingCat1('');
+  // ============ 拖拽排序（pointer 自定义：按住移动 5px 进入拖拽，elementFromPoint 找目标） ============
+  const resetDrag = () => {
+    dragRef.current = null;
+    dropTargetRef.current = null;
+    draggingRef.current = false;
+    startPosRef.current = null;
+    setDragName(null);
+    setDropTarget(null);
+  };
+
+  const orderByName = (cats: Cat1[], names: string[]) =>
+    names.map((n) => cats.find((c) => c.name === n)).filter((c): c is Cat1 => Boolean(c));
+
+  // 纯函数：从 list 中把 fromName 移动到 targetName 的 before/after 位置，返回新顺序；非法入参返回 null
+  function computeInsertOrder<T extends string>(list: T[], fromName: T, toName: T, position: 'before' | 'after'): T[] | null {
+    const from = list.indexOf(fromName);
+    const to = list.indexOf(toName);
+    if (from < 0 || to < 0 || from === to) return null;
+    const next = [...list];
+    next.splice(from, 1);
+    const newTo = to > from ? to - 1 : to;
+    const insertPos = position === 'before' ? newTo : newTo + 1;
+    next.splice(insertPos, 0, fromName);
+    return next;
+  }
+
+  const handlePointerDown = (e: React.PointerEvent, item: DragState) => {
+    if (e.button !== 0) return; // 仅鼠标左键 / 触屏单点
+    dragRef.current = item;
+    startPosRef.current = { x: e.clientX, y: e.clientY };
+    // 锁定指针到该元素，保证快速拖动不丢事件
+    (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    const drag = dragRef.current;
+    const start = startPosRef.current;
+    if (!drag || !start) return;
+    // 移动距离 < 5px 视为点击，不进入拖拽
+    if (!draggingRef.current) {
+      if (Math.hypot(e.clientX - start.x, e.clientY - start.y) < 5) return;
+      draggingRef.current = true;
+      setDragName(drag.name);
+    }
+    // 命中当前指针位置的最近 cell/sub-cell
+    const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
+    const target = el?.closest('.catmgr-cell, .catmgr-sub-cell') as HTMLElement | null;
+    if (!target?.dataset.name) {
+      if (dropTargetRef.current) { dropTargetRef.current = null; setDropTarget(null); }
       return;
     }
-    if (categories.find((c) => c.name === editingCat1NewName.trim())) {
-      message.warning(t('cat.nameExists'));
+    const tn = target.dataset.name;
+    const tp = target.dataset.parent || undefined;
+    // 排除自身 + 跨层（cat2 drag 必须同 parent；cat1/income drag 不能落子类）
+    if (tn === drag.name) {
+      if (dropTargetRef.current) { dropTargetRef.current = null; setDropTarget(null); }
       return;
     }
-    await renameCategory1(editingCat1, editingCat1NewName.trim());
-    message.success(t('cat.renamed'));
-    setEditingCat1('');
-    await load();
+    if (drag.kind === 'cat2' && tp !== drag.parent) {
+      if (dropTargetRef.current) { dropTargetRef.current = null; setDropTarget(null); }
+      return;
+    }
+    if (drag.kind !== 'cat2' && tp) {
+      if (dropTargetRef.current) { dropTargetRef.current = null; setDropTarget(null); }
+      return;
+    }
+    // before/after：指针 y 在目标上半 → before，下半 → after
+    const rect = target.getBoundingClientRect();
+    const position: 'before' | 'after' = e.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
+    const next: { name: string; parent?: string; position: 'before' | 'after' } = { name: tn, parent: tp, position };
+    dropTargetRef.current = next;
+    setDropTarget(next);
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    const drag = dragRef.current;
+    const target = dropTargetRef.current;
+    const wasDragging = draggingRef.current;
+    (e.currentTarget as Element).releasePointerCapture?.(e.pointerId);
+    if (wasDragging && drag && target && target.name !== drag.name) {
+      e.preventDefault(); // 阻止后续 click（避免点击事件误触发）
+      handleDropAt(drag, target);
+    }
+    resetDrag();
+  };
+
+  const handleDropAt = async (drag: DragState, target: { name: string; parent?: string; position: 'before' | 'after' }) => {
+    if (drag.kind === 'cat2') {
+      const parent = drag.parent!;
+      const list = expenseCats.find((c) => c.name === parent)?.children ?? [];
+      const next = computeInsertOrder(list, drag.name, target.name, target.position);
+      if (!next) return;
+      setExpenseCats((cats) => cats.map((c) => (c.name === parent ? { ...c, children: next } : c)));
+      await Promise.all(next.map((n, i) => updateCategory2Sort(n, parent, i)));
+    } else {
+      const list = currentCats.map((c) => c.name);
+      const next = computeInsertOrder(list, drag.name, target.name, target.position);
+      if (!next) return;
+      if (tab === 'income') setIncomeCats(orderByName(incomeCats, next));
+      else setExpenseCats(orderByName(expenseCats, next));
+      await Promise.all(next.map((n, i) => updateCategory1Sort(n, i)));
+    }
     onChanged();
   };
 
-  const handleRenameCat2 = async () => {
-    if (!editingCat2 || !editingCat2NewName.trim() || editingCat2NewName.trim() === editingCat2.name) {
-      setEditingCat2(null);
-      return;
-    }
-    const parent = categories.find((c) => c.name === editingCat2.parent);
-    if (parent?.children.find((c) => c === editingCat2NewName.trim())) {
-      message.warning(t('cat.subExists'));
-      return;
-    }
-    await renameCategory2(editingCat2.name, editingCat2NewName.trim(), editingCat2.parent);
-    message.success(t('cat.renamed'));
-    setEditingCat2(null);
-    await load();
-    onChanged();
+  const addTitle = () => {
+    if (!sheet || sheet.mode !== 'add') return '';
+    // 一级类别按收支 tab 区分标题
+    return sheet.kind === 'income' ? t('cat.addIncome') : t('cat.addExpenseCat');
   };
 
-  const cat1Items = categories.map((cat) => ({
-    key: cat.name,
-    label: (
-      <span>
-        {cat.icon} {translateCategory(lang, cat.name)}
-        <span style={{ color: '#999', marginLeft: 8, fontSize: 12 }}>
-          ({t('cat.childrenCount', { n: cat.children.length })})
-        </span>
-      </span>
-    ),
-    styles: { body: { padding: '2px 8px 6px' } },
-    children: (
-      <div>
-        {/* 一级分类操作 */}
-        {editingCat1 === cat.name ? (
-          <Space style={{ marginBottom: 12 }}>
-            <Input
-              size="small"
-              value={editingCat1NewName}
-              onChange={(e) => setEditingCat1NewName(e.target.value)}
-              onPressEnter={handleRenameCat1}
-              style={{ width: 120 }}
-            />
-            <Button size="small" type="primary" onClick={handleRenameCat1}>{t('cat.ok')}</Button>
-            <Button size="small" onClick={() => setEditingCat1('')}>{t('list.cancel')}</Button>
-          </Space>
-        ) : (
-          <Space style={{ marginBottom: 12 }}>
-            {!isDefaultCat1(cat.name) && (
-              <>
-                <Button size="small" icon={<EditOutlined />}
-                  onClick={() => { setEditingCat1(cat.name); setEditingCat1NewName(cat.name); }}>
-                  {t('cat.rename')}
-                </Button>
-                <Button size="small" danger icon={<DeleteOutlined />} onClick={() => handleDeleteCat1(cat.name)}>
-                  {t('cat.delete')}
-                </Button>
-              </>
-            )}
-          </Space>
-        )}
+  const activeEmojiGroups = tab === 'income' ? INCOME_EMOJI_GROUPS : EMOJI_GROUPS;
 
-        {/* 二级分类列表 */}
-        <List
-          size="small"
-          dataSource={cat.children}
-          renderItem={(child: string) => {
-            const isEditing = editingCat2?.name === child && editingCat2?.parent === cat.name;
-            return (
-            <List.Item
-              actions={
-                isEditing ? undefined : (
-                  !isDefaultCat2(child) ? [
-                    <Space size="small" key="actions">
-                      <Button size="small" type="text" icon={<EditOutlined />}
-                        onClick={() => {
-                          setEditingCat2({ name: child, parent: cat.name });
-                          setEditingCat2NewName(child);
-                        }}
-                      />
-                      <Button size="small" type="text" danger icon={<DeleteOutlined />}
-                        onClick={() => handleDeleteCat2(child, cat.name)} />
-                    </Space>
-                  ] : undefined
-                )
-              }
-            >
-              {isEditing ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
-                  <Input
-                    size="small"
-                    value={editingCat2NewName}
-                    onChange={(e) => setEditingCat2NewName(e.target.value)}
-                    onPressEnter={handleRenameCat2}
-                    style={{ flex: 1, minWidth: 0 }}
-                    autoFocus
-                  />
-                  <Button size="small" type="primary" onClick={handleRenameCat2}>{t('cat.ok')}</Button>
-                  <Button size="small" onClick={() => setEditingCat2(null)}>{t('list.cancel')}</Button>
-                </div>
-              ) : (
-                translateCategory(lang, child)
-              )}
-            </List.Item>
-          )}}
-        />
+  // 角标：锁定（纯展示）/ 红✕删除（点击 → 两步确认）
+  const badge = (kind: CatKind, name: string, parent?: string) =>
+    isLocked(kind, name, parent) ? (
+      <span className="catmgr-badge lock" aria-label="locked"><LockOutlined /></span>
+    ) : (
+      <button
+        type="button"
+        className="catmgr-badge del"
+        aria-label="delete"
+        onClick={(e) => { e.stopPropagation(); requestDelete(kind, name, parent); }}
+      >
+        <CloseOutlined />
+      </button>
+    );
 
-        {/* 添加小类 */}
-        {newCat2Parent === cat.name && (
-          <Space style={{ marginTop: 8 }}>
-            <Input
-              size="small"
-              placeholder={t('cat.cat2Placeholder')}
-              value={newCat2Name}
-              onChange={(e) => setNewCat2Name(e.target.value)}
-              onPressEnter={handleAddCat2}
-              style={{ width: 120 }}
-            />
-            <Button size="small" type="primary" onClick={handleAddCat2}>{t('cat.ok')}</Button>
-            <Button size="small" onClick={() => { setNewCat2Parent(''); setNewCat2Name(''); }}>{t('list.cancel')}</Button>
-          </Space>
-        )}
-        {newCat2Parent !== cat.name && (
-          <Button size="small" type="dashed" icon={<PlusOutlined />} block
-            onClick={() => setNewCat2Parent(cat.name)}
-            style={{ marginTop: 8 }}>
-            {t('cat.addCat2')}
-          </Button>
-        )}
-      </div>
-    ),
-  }));
+  // 格子属性：pointer 拖拽 + data-name/data-parent 用于命中查找
+  const cellProps = (kind: CatKind, name: string, parent?: string) => {
+    const item: DragState = { kind, name, parent };
+    return {
+      onPointerDown: (e: React.PointerEvent) => handlePointerDown(e, item),
+      onPointerMove: handlePointerMove,
+      onPointerUp: handlePointerUp,
+    };
+  };
 
   return (
-    <>
-    <Modal
-      title={<span><SettingOutlined /> {t('cat.title')}</span>}
-      open={open}
-      onCancel={onClose}
-      width="min(520px, calc(100vw - 24px))"
-      footer={null}
-      maskClosable={false}
-      centered
-    >
-      {/* 添加一级分类 */}
-      <div style={{ marginBottom: 16 }}>
-        <span style={{ lineHeight: '32px', fontWeight: 600 }}>{t('cat.selectIcon')}</span>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-          {EMOJI_LIST.map((emoji) => (
+    <div className="catmgr-page">
+      {/* 顶栏 */}
+      <header className="catmgr-header">
+        <button type="button" className="catmgr-back" onClick={onClose} aria-label="back"><LeftOutlined /></button>
+        <span className="catmgr-title">{t('cat.title')}</span>
+        <span style={{ width: 32 }} />
+      </header>
+
+      {/* 支出 / 收入分段 */}
+      <div style={{ padding: '4px 16px 0' }}>
+        <div className="stats-seg" style={{ margin: 0 }}>
+          {(['expense', 'income'] as TxType[]).map((v) => (
             <span
-              key={emoji}
-              onClick={() => setNewCat1Icon(emoji)}
-              style={{
-                fontSize: 20,
-                cursor: 'pointer',
-                padding: '2px 4px',
-                borderRadius: 4,
-                background: newCat1Icon === emoji ? 'rgba(82,196,26,0.15)' : 'transparent',
-                border: newCat1Icon === emoji ? '2px solid #52c41a' : '2px solid transparent',
-              }}
+              key={v}
+              className={`stats-seg-item${tab === v ? ' active' : ''}`}
+              onClick={() => { setTab(v); setSelectedCat1(null); resetDrag(); }}
             >
-              {emoji}
+              {t(v === 'income' ? 'form.income' : 'form.expense')}
             </span>
           ))}
         </div>
-        <Space.Compact style={{ width: '100%', marginTop: 8 }}>
-          <Input
-            placeholder={t('cat.cat1Placeholder')}
-            value={newCat1}
-            onChange={(e) => setNewCat1(e.target.value)}
-            onPressEnter={handleAddCat1}
-            prefix={newCat1Icon}
-          />
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleAddCat1}>{t('cat.addCat1')}</Button>
-        </Space.Compact>
       </div>
 
-      {/* 现有分类 */}
-      <Collapse items={cat1Items} className="cat-collapse" styles={{ body: { padding: '4px 8px' } }} />
-    </Modal>
-
-      {/* 删除确认弹窗 */}
-      <Modal
-        title={null}
-        open={!!confirm}
-        centered
-        onOk={async () => {
-          if (confirm) { await confirm.onOk(); setConfirm(null); }
-        }}
-        onCancel={() => setConfirm(null)}
-        okText={confirm?.okText}
-        okButtonProps={{ danger: true, style: { borderRadius: 20 } }}
-        cancelText={t('list.cancel')}
-        cancelButtonProps={{ style: { borderRadius: 20 } }}
-      >
-        <div style={{ textAlign: 'center', padding: '8px 0 4px' }}>
-          <div style={{
-            width: 48, height: 48, borderRadius: '50%', background: '#fff1f0',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            margin: '0 auto 12px', fontSize: 22,
-          }}><DeleteOutlined /></div>
-          <p style={{ fontSize: 16, fontWeight: 600, margin: '0 0 8px', color: '#333' }}>
-            {confirm?.title}
-          </p>
-          <p style={{ fontSize: 14, color: '#666', margin: 0 }}>
-            {confirm?.content}
-          </p>
+      {/* 一级类别网格 */}
+      <div className="catmgr-body">
+        <div className="catmgr-grid">
+          {currentCats.map((cat) => {
+            const kind = tab === 'income' ? 'income' as CatKind : 'cat1' as CatKind;
+            const dragging = dragName === cat.name;
+            const dropBefore = dropTarget?.name === cat.name && dropTarget.position === 'before';
+            const dropAfter = dropTarget?.name === cat.name && dropTarget.position === 'after';
+            return (
+              <div
+                key={cat.name}
+                data-name={cat.name}
+                className={`catmgr-cell${selectedCat1 === cat.name ? ' selected' : ''}${dragging ? ' dragging' : ''}${dropBefore ? ' drop-before' : ''}${dropAfter ? ' drop-after' : ''}`}
+                onClick={() => setSelectedCat1(cat.name)}
+                {...cellProps(kind, cat.name)}
+              >
+                <span className="catmgr-cell-icon">{cat.icon}</span>
+                <span className="catmgr-cell-name">{translateCategory(lang, cat.name)}</span>
+                {badge(kind, cat.name)}
+              </div>
+            );
+          })}
+          <button type="button" className="catmgr-cell-add" onClick={() => openAdd(tab === 'income' ? 'income' : 'cat1')}>
+            <PlusOutlined />
+            <span>{tab === 'income' ? t('cat.addIncome') : t('cat.addCat1')}</span>
+          </button>
         </div>
-      </Modal>
-    </>
+
+        {/* 子类别区（支出、点选一级后浮现；添加为原页面内联输入，不跳页） */}
+        {tab === 'expense' && selectedCat && (
+          <div className="catmgr-sub-section">
+            <div className="catmgr-sub-grid">
+              {selectedCat.children.map((sub) => {
+                const dragging = dragName === sub;
+                const dropBefore = dropTarget?.name === sub && dropTarget.position === 'before';
+                const dropAfter = dropTarget?.name === sub && dropTarget.position === 'after';
+                return (
+                  <div
+                    key={sub}
+                    data-name={sub}
+                    data-parent={selectedCat.name}
+                    className={`catmgr-sub-cell${dragging ? ' dragging' : ''}${dropBefore ? ' drop-before' : ''}${dropAfter ? ' drop-after' : ''}`}
+                    {...cellProps('cat2', sub, selectedCat.name)}
+                  >
+                    <span className="catmgr-sub-name">{translateCategory(lang, sub)}</span>
+                    {badge('cat2', sub, selectedCat.name)}
+                  </div>
+                );
+              })}
+              {inlineAdd ? (
+                <div className="catmgr-inline-add">
+                  <Input
+                    placeholder={t('cat.cat2Placeholder')}
+                    value={inlineValue}
+                    status={inlineError ? 'error' : undefined}
+                    onChange={(e) => { setInlineValue(e.target.value); if (inlineError) setInlineError(''); }}
+                    onPressEnter={submitInline}
+                    maxLength={12}
+                    autoFocus
+                  />
+                  <button type="button" className="catmgr-inline-cancel" onClick={() => setInlineAdd(false)}>{t('cat.cancel')}</button>
+                  <button type="button" className="catmgr-inline-ok" disabled={!inlineValue.trim()} onClick={submitInline}>{t('cat.ok')}</button>
+                  {inlineError && <div className="sheet-input-error">{inlineError}</div>}
+                </div>
+              ) : (
+                <button type="button" className="catmgr-sub-add" onClick={openInline}>
+                  <PlusOutlined />
+                  <span>{t('cat.addCat2')}</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 删除确认底部面板 */}
+      {sheet?.mode === 'confirm-delete' && (
+        <>
+          <div className="sheet-mask" onClick={() => setSheet(null)} />
+          <div className="sheet-panel">
+            <div className="sheet-grabber" />
+            <div className="sheet-confirm">
+              <div className="sheet-confirm-icon"><DeleteOutlined /></div>
+              <div className="sheet-title">{t('cat.deleteTitle')}「{translateCategory(lang, sheet.name)}」</div>
+              <p className="sheet-confirm-desc">
+                {sheet.count > 0
+                  ? t(sheet.kind === 'cat2' ? 'cat.deleteSubContent' : 'cat.deleteContent', { count: sheet.count })
+                  : t('cat.deleteSimpleContent')}
+              </p>
+              <div className="sheet-btn-row">
+                <button type="button" className="sheet-btn ghost" onClick={() => setSheet(null)}>
+                  {t('list.cancel')}
+                </button>
+                <button type="button" className="sheet-btn danger" disabled={deleting} onClick={executeDelete}>
+                  {t('cat.keepDelete')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* 添加类别全屏面板：上半固定（大图标预览 + 类别名称），下半滚动（分组 emoji） */}
+      {sheet?.mode === 'add' && (
+        <div className="addcat-page">
+          <header className="addcat-header">
+            <button type="button" className="addcat-cancel" onClick={() => setSheet(null)}>{t('cat.cancel')}</button>
+            <span className="addcat-title">{addTitle()}</span>
+            <button
+              type="button"
+              className="addcat-done"
+              disabled={!inputValue.trim()}
+              onClick={submitAdd}
+            >{t('cat.done')}</button>
+          </header>
+          {/* 固定区：图标 → 名称（滑动图标时保持不动） */}
+          <div className="addcat-fixed">
+            <div className="addcat-preview"><span>{inputIcon}</span></div>
+            <div className="addcat-input-row">
+              <Input
+                placeholder={t('cat.cat1Placeholder')}
+                value={inputValue}
+                status={inputError ? 'error' : undefined}
+                onChange={(e) => { setInputValue(e.target.value); if (inputError) setInputError(''); }}
+                onPressEnter={submitAdd}
+                maxLength={12}
+                autoFocus
+                prefix={inputIcon}
+              />
+            </div>
+            {inputError && <div className="sheet-input-error">{inputError}</div>}
+          </div>
+          {/* 滚动区：分组 emoji 选择 */}
+          <div className="addcat-icon-scroll">
+            {activeEmojiGroups.map((g) => (
+              <div className="addcat-group" key={g.zh}>
+                <div className="addcat-group-label">{lang === 'zh' ? g.zh : g.en}</div>
+                <div className="addcat-group-icons">
+                  {g.icons.map((emoji) => (
+                    <span
+                      key={emoji}
+                      className={`addcat-emoji${inputIcon === emoji ? ' selected' : ''}`}
+                      onClick={() => setInputIcon(emoji)}
+                    >
+                      {emoji}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

@@ -1,6 +1,6 @@
 // 青禾记账 - 数据库操作
 import Database from '@tauri-apps/plugin-sql';
-import { defaultCategories } from './data/categories';
+import { defaultCategories, incomeCategories } from './data/categories';
 
 let db: Database | null = null;
 let initPromise: Promise<Database> | null = null;
@@ -59,15 +59,31 @@ export async function initDatabase(): Promise<Database> {
     await db.execute(`ALTER TABLE expenses ADD COLUMN type TEXT NOT NULL DEFAULT 'expense'`);
   }
 
-  // 一级分类表
+  // 一级分类表（type 区分支出/收入；收入分类无子类）
   await db.execute(`
     CREATE TABLE IF NOT EXISTS categories1 (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL UNIQUE,
       icon TEXT DEFAULT '📦',
-      sort_order INTEGER DEFAULT 0
+      sort_order INTEGER DEFAULT 0,
+      type TEXT NOT NULL DEFAULT 'expense'
     )
   `);
+
+  // 迁移：已有库补 type 列（新建库的 CREATE 已含，此步幂等）
+  const cat1Cols = await db.select<{ name: string }[]>(`PRAGMA table_info(categories1)`);
+  if (!cat1Cols.some((c) => c.name === 'type')) {
+    await db.execute(`ALTER TABLE categories1 ADD COLUMN type TEXT NOT NULL DEFAULT 'expense'`);
+  }
+
+  // 收入预设分类入库（幂等；sort_order 从 100 起，避免扰动支出排序）
+  for (let i = 0; i < incomeCategories.length; i++) {
+    const c = incomeCategories[i];
+    await db.execute(
+      `INSERT OR IGNORE INTO categories1 (name, icon, sort_order, type) VALUES ($1, $2, $3, 'income')`,
+      [c.name, c.icon, 100 + i]
+    );
+  }
 
   // 二级分类表
   await db.execute(`
@@ -281,6 +297,7 @@ export interface Category1Row {
   name: string;
   icon: string;
   sort_order: number;
+  type?: TxType;
 }
 
 export interface Category2Row {
@@ -290,12 +307,16 @@ export interface Category2Row {
   sort_order: number;
 }
 
-// 获取所有分类（组装成树形结构）
-export async function getCategories(): Promise<{ name: string; icon: string; children: string[] }[]> {
+// 获取分类（组装成树形结构；type=expense 支出两级树，type=income 收入单级列表）
+export async function getCategories(type: TxType = 'expense'): Promise<{ name: string; icon: string; children: string[] }[]> {
   const database = await initDatabase();
   const cat1List = await database.select<Category1Row[]>(
-    'SELECT * FROM categories1 ORDER BY sort_order'
+    'SELECT * FROM categories1 WHERE type = $1 ORDER BY sort_order',
+    [type]
   );
+  if (type === 'income') {
+    return cat1List.map((c1) => ({ name: c1.name, icon: c1.icon, children: [] }));
+  }
   const cat2List = await database.select<Category2Row[]>(
     'SELECT * FROM categories2 ORDER BY sort_order'
   );
@@ -309,15 +330,16 @@ export async function getCategories(): Promise<{ name: string; icon: string; chi
   }));
 }
 
-// 添加一级分类
-export async function addCategory1(name: string, icon: string): Promise<void> {
+// 添加一级分类（type 缺省支出；收入传 'income'）
+export async function addCategory1(name: string, icon: string, type: TxType = 'expense'): Promise<void> {
   const database = await initDatabase();
   const max = await database.select<[{ m: number }]>(
-    'SELECT COALESCE(MAX(sort_order), -1) as m FROM categories1'
+    'SELECT COALESCE(MAX(sort_order), -1) as m FROM categories1 WHERE type = $1',
+    [type]
   );
   await database.execute(
-    'INSERT INTO categories1 (name, icon, sort_order) VALUES ($1, $2, $3)',
-    [name, icon, (max[0]?.m || 0) + 1]
+    'INSERT INTO categories1 (name, icon, sort_order, type) VALUES ($1, $2, $3, $4)',
+    [name, icon, (max[0]?.m || 0) + 1, type]
   );
 }
 
@@ -332,6 +354,18 @@ export async function addCategory2(name: string, parent: string): Promise<void> 
     'INSERT INTO categories2 (name, parent, sort_order) VALUES ($1, $2, $3)',
     [name, parent, (max[0]?.m || 0) + 1]
   );
+}
+
+// 更新一级分类排序（拖拽重排用，expense/income 共用）
+export async function updateCategory1Sort(name: string, sort: number): Promise<void> {
+  const database = await initDatabase();
+  await database.execute('UPDATE categories1 SET sort_order = $1 WHERE name = $2', [sort, name]);
+}
+
+// 更新二级分类排序（子分类拖拽重排用，仅在父类内重排）
+export async function updateCategory2Sort(name: string, parent: string, sort: number): Promise<void> {
+  const database = await initDatabase();
+  await database.execute('UPDATE categories2 SET sort_order = $1 WHERE name = $2 AND parent = $3', [sort, name, parent]);
 }
 
 // 删除一级分类（同时删除其二级分类）

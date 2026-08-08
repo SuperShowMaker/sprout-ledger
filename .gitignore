@@ -1,6 +1,9 @@
 # Local-only Claude settings (machine-specific)
 .claude/settings.local.json
 
+# WorkBuddy memory & process docs (machine-specific)
+.workbuddy/
+
 # Logs
 logs
 *.log

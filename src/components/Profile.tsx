@@ -11,16 +11,11 @@ dayjs.extend(weekOfYear);
 import { useI18n } from '../i18n/I18nContext';
 import { getAllExpensesForExport, batchAddExpenses, getCategories, clearAllExpenses, Expense } from '../db';
 import { buildExportRow, parseImportCsv } from '../csv';
-import { incomeCat1Names } from '../data/categories';
 import { useData } from '../DataContext';
 import CategoryManager from './CategoryManager';
 import { isDebugMode, setDebugMode as _setDebugMode } from '../debug';
 
 type ExportMode = 'all' | 'year' | 'month' | 'week' | 'range';
-
-const getSetting = (key: string, def: boolean): boolean => {
-  try { const v = localStorage.getItem(`sprout_${key}`); return v !== null ? v === '1' : def; } catch { return def; }
-};
 
 export default function Profile() {
   const { t, lang, darkMode, toggleLang, toggleDark } = useI18n();
@@ -30,7 +25,6 @@ export default function Profile() {
 
   // 导出
   const [exportVisible, setExportVisible] = useState(false);
-  const [statsVisible, setStatsVisible] = useState(false);
   const [exportMode, setExportMode] = useState<ExportMode>('all');
   const [exportYear, setExportYear] = useState<Dayjs>(dayjs());
   const [exportMonth, setExportMonth] = useState<Dayjs>(dayjs());
@@ -105,9 +99,10 @@ export default function Profile() {
       if (content.length > 10 * 1024 * 1024) throw new Error(lang === 'zh' ? '文件过大（上限10MB）' : 'File too large (max 10MB)');
       const lines = content.trim().split('\n').map(l => l.trim()).filter(Boolean);
       if (lines.length < 2) throw new Error(t('import.emptyFile'));
-      const allCats = await getCategories();
-      // 校验集合：DB 支出分类 + 收入预设分类（收入记录导入也能通过分类校验）
-      const cat1Set = new Set(allCats.map(c => c.name).concat(incomeCat1Names));
+      const allCats = await getCategories('expense');
+      const incomeCats = await getCategories('income');
+      // 校验集合：DB 支出分类 + DB 收入分类（含自定义，收入记录导入也能通过分类校验）
+      const cat1Set = new Set(allCats.map(c => c.name).concat(incomeCats.map(c => c.name)));
       const cat2Map: Record<string, Set<string>> = {};
       allCats.forEach(c => { cat2Map[c.name] = new Set(c.children); });
       const { headerInvalid, parsed, errors } = parseImportCsv(content, { cat1Set, cat2Map });
@@ -133,12 +128,7 @@ export default function Profile() {
     }
   };
 
-  // 统计设置
   const rowStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', fontSize: 14 };
-  const saveSetting = (key: string, val: boolean) => { localStorage.setItem(`sprout_${key}`, val ? '1' : '0'); window.dispatchEvent(new Event('storage')); };
-  const [showPie, setShowPie] = useState(() => getSetting('stats_showPie', true));
-  const [showTrend, setShowTrend] = useState(() => getSetting('stats_showTrend', true));
-  const [showDailyAvg, setShowDailyAvg] = useState(() => getSetting('stats_showDailyAvg', false));
 
   // 自动打开导出（来自备份提醒的跳转）
   useEffect(() => {
@@ -151,7 +141,6 @@ export default function Profile() {
   const menuItems = [
     { key: 'lang', icon: <GlobalOutlined />, label: (<div className="profile-row"><span>{lang === 'zh' ? '语言 / Language' : 'Language'}</span><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ color: '#999', fontSize: 13 }}>{lang === 'zh' ? '中文' : 'English'}</span><Switch checked={lang === 'en'} onChange={toggleLang} size="small" /></div></div>), },
     { key: 'darkMode', icon: <span style={{ fontSize: 18 }}>{darkMode ? '🌙' : '☀️'}</span>, label: (<div className="profile-row"><span>{lang === 'zh' ? '深色模式' : 'Dark Mode'}</span><Switch checked={darkMode} onChange={() => toggleDark()} size="small" /></div>), },
-    { key: 'stats-settings', icon: <span style={{ fontSize: 18 }}>📊</span>, label: (<div className="profile-row" onClick={() => setStatsVisible(true)}><span>{lang === 'zh' ? '统计显示' : 'Stats'}</span><span style={{ color: '#bbb' }}>›</span></div>), },
     { key: 'export', icon: <DownloadOutlined />, label: (<div className="profile-row" onClick={() => setExportVisible(true)}><span>{lang === 'zh' ? '导出数据' : 'Export Data'}</span><span style={{ color: '#bbb' }}>›</span></div>), },
     { key: 'import', icon: <UploadOutlined />, label: (<div className="profile-row" onClick={handleImport}><span>{lang === 'zh' ? '导入数据' : 'Import Data'}</span><span style={{ color: '#bbb' }}>›</span></div>), },
     { key: 'categories', icon: <SettingOutlined />, label: (<div className="profile-row" onClick={() => setCatManagerOpen(true)}><span>{t('form.manageCategory')}</span><span style={{ color: '#bbb' }}>›</span></div>), },
@@ -189,13 +178,6 @@ export default function Profile() {
           {exportMode === 'range' && (<Space style={{ width: '100%' }}><DatePicker value={exportStart} onChange={(d) => setExportStart(d || dayjs())} allowClear={false} /><span>~</span><DatePicker value={exportEnd} onChange={(d) => setExportEnd(d || dayjs())} allowClear={false} /></Space>)}
         </div>
         <Button type="primary" icon={<DownloadOutlined />} onClick={handleExport} loading={exporting} block style={{ borderRadius: 20, height: 40 }}>{t('list.exportCSV')}</Button>
-      </Modal>
-      <Modal title={lang === 'zh' ? '统计显示' : 'Stats'} open={statsVisible} onCancel={() => setStatsVisible(false)} footer={null} centered width="min(320px, calc(100vw - 48px))">
-        <div className="profile-setting-items">
-          <div className="profile-row" style={{ padding: '10px 0' }}><span>{lang === 'zh' ? '分类饼图' : 'Pie Chart'}</span><Switch checked={showPie} onChange={(v) => { setShowPie(v); saveSetting('stats_showPie', v); }} size="small" /></div>
-          <div className="profile-row" style={{ padding: '10px 0' }}><span>{lang === 'zh' ? '趋势图' : 'Trend'}</span><Switch checked={showTrend} onChange={(v) => { setShowTrend(v); saveSetting('stats_showTrend', v); }} size="small" /></div>
-          <div className="profile-row" style={{ padding: '10px 0' }}><span>{lang === 'zh' ? '日均 & 最大单笔' : 'Daily Avg & Max'}</span><Switch checked={showDailyAvg} onChange={(v) => { setShowDailyAvg(v); saveSetting('stats_showDailyAvg', v); }} size="small" /></div>
-        </div>
       </Modal>
       <Modal title={t('import.title')} open={importState.phase !== 'idle'} footer={importState.phase === 'done' ? (<Button type="primary" block onClick={() => importDispatch({ type: 'DISMISS' })} style={{ borderRadius: 20, height: 40 }}>{lang === 'zh' ? '知道了' : 'Got it'}</Button>) : null} closable={true} maskClosable={true} onCancel={() => importDispatch({ type: 'DISMISS' })} centered width="min(360px, calc(100vw - 48px))">
         {importState.phase === 'done' ? (
@@ -243,7 +225,7 @@ export default function Profile() {
           <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #f0f0f0', fontSize: 11, color: '#bbb' }}>Tauri 2 · React 19 · SQLite<br />{'©'} 2026 Sprout Ledger</div>
         </div>
       </Modal>
-      <CategoryManager open={catManagerOpen} onClose={() => setCatManagerOpen(false)} onChanged={() => {}} />
+      <CategoryManager open={catManagerOpen} onClose={() => setCatManagerOpen(false)} onChanged={refresh} />
     </div>
   );
 }

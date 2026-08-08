@@ -11,6 +11,10 @@ vi.mock('../DataContext', () => ({
       { name: '餐饮饮食', icon: '🍜', children: ['早餐', '午餐'] },
       { name: '交通出行', icon: '🚗', children: [] },
     ],
+    incomeCats: [
+      { name: '工资收入', icon: '💰', children: [] },
+      { name: '奖金收入', icon: '🏆', children: [] },
+    ],
     refresh: vi.fn(),
     setViewMonth: vi.fn(),
   }),
@@ -27,7 +31,7 @@ vi.mock('../i18n/I18nContext', () => ({
       'form.saveSuccess': '记录成功！',
       'form.saveFailed': '保存失败',
       'form.invalidAmount': '请输入有效的金额',
-      'form.selectCategoryRequired': '请选择分类',
+      'form.selectCategoryRequired': '请选择类别',
       'form.note': '添加备注',
       'cat.cancel': '取消',
     }[k] || k),
@@ -40,17 +44,16 @@ afterEach(() => {
 });
 
 describe('RecordFlow 收支切换', () => {
-  it('默认支出：显示支出分类、标题为记账，不显示收入分类', () => {
+  it('默认支出：顶栏并列显示收支、支出分类可见，不显示收入分类', () => {
     render(<RecordFlow open onClose={() => {}} onSaved={() => {}} />);
-    expect(screen.getByText('记账')).toBeTruthy();
+    expect(screen.getByText('支出')).toBeTruthy();
     expect(screen.getByText('餐饮饮食')).toBeTruthy();
     expect(screen.queryByText('工资收入')).toBeNull();
   });
 
-  it('切到收入：显示收入分类、标题为记收入，不显示支出分类', () => {
+  it('切到收入：收入分类可见，不显示支出分类', () => {
     render(<RecordFlow open onClose={() => {}} onSaved={() => {}} />);
     fireEvent.click(screen.getByText('收入'));
-    expect(screen.getByText('记收入')).toBeTruthy();
     expect(screen.getByText('工资收入')).toBeTruthy();
     expect(screen.queryByText('餐饮饮食')).toBeNull();
   });

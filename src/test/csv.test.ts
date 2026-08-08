@@ -137,10 +137,30 @@ describe('parseImportCsv 导入解析', () => {
     expect(r.parsed[0].type).toBe('income');
   });
 
-  it('导出→解析 round-trip 全字段一致', () => {
+  it('导出→解析 round-trip 全字段一致（新表头）', () => {
     const exp: Expense = { amount: 88.5, category1: '工资收入', category2: '', date: '2026-08-02', note: '八月工资', created_at: '2026-08-02 08:00:00.001', type: 'income' };
-    const header = '日期,一级分类,二级分类,金额,备注,记录时间,类型';
+    const header = '日期,一级类别,二级类别,金额,备注,记录时间,类型';
     const r = parseImportCsv(`${header}\n${buildExportRow(exp, 'zh')}`, cats);
     expect(r.parsed[0]).toMatchObject({ type: 'income', amount: 88.5, category1: '工资收入', date: '2026-08-02', note: '八月工资', created_at: '2026-08-02 08:00:00.001' });
+  });
+
+  it('新表头「一级类别/二级类别」正常解析', () => {
+    const csv = [
+      '日期,一级类别,二级类别,金额,备注,记录时间,类型',
+      '2026-08-01,餐饮饮食,早餐,15,,t,支出',
+    ].join('\n');
+    const r = parseImportCsv(csv, cats);
+    expect(r.headerInvalid).toBe(false);
+    expect(r.parsed[0]).toMatchObject({ type: 'expense', category1: '餐饮饮食', category2: '早餐', amount: 15 });
+  });
+
+  it('旧表头「一级分类/二级分类」仍可导入（别名兼容）', () => {
+    const csv = [
+      '日期,一级分类,二级分类,金额,备注,记录时间,类型',
+      '2026-08-01,餐饮饮食,早餐,15,,t,支出',
+    ].join('\n');
+    const r = parseImportCsv(csv, cats);
+    expect(r.headerInvalid).toBe(false);
+    expect(r.parsed[0]).toMatchObject({ type: 'expense', category1: '餐饮饮食', category2: '早餐', amount: 15 });
   });
 });

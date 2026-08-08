@@ -98,10 +98,8 @@ export default function BudgetPage() {
 
   const totalPct = totalBudget > 0 ? (totalSpend / totalBudget) * 100 : 0;
   const totalRemaining = totalBudget - totalSpend;
-  const totalDaily = totalBudget > 0 ? totalBudget / daysInMonth : 0;
   const spentDaily = daysElapsed > 0 ? totalSpend / daysElapsed : 0;
-  const projection = spentDaily * daysInMonth;
-  const projectedDiff = totalBudget - projection;
+  const projectedDiff = totalBudget - spentDaily * daysInMonth;
 
   const totalColor = pctColor(totalPct);
   const R = 26;
@@ -184,16 +182,12 @@ export default function BudgetPage() {
                         ? t('budget.over', { amount: Math.abs(totalRemaining).toFixed(0) })
                         : `${t('budget.remaining')} ¥${totalRemaining.toFixed(0)}`}
                     </span>
-                    <span className="budget-total-meta-daily">
-                      {' · '}{t('budget.dailyAvg')} ¥{spentDaily.toFixed(0)}/天 vs ¥{totalDaily.toFixed(0)}/天
-                    </span>
                   </div>
-                  <div className="budget-total-projection" style={{ color: projectedDiff >= 0 ? '#52c41a' : '#ff4d4f' }}>
-                    {t('budget.projection', { amount: projection.toFixed(0) })}
-                    {projectedDiff >= 0
-                      ? t('budget.projectedSave', { amount: projectedDiff.toFixed(0) })
-                      : t('budget.projectedOver', { amount: Math.abs(projectedDiff).toFixed(0) })}
-                  </div>
+                  {projectedDiff < 0 && (
+                    <div className="budget-total-projection" style={{ color: '#ff4d4f' }}>
+                      {t('budget.projectedOver', { amount: Math.abs(projectedDiff).toFixed(0) })}
+                    </div>
+                  )}
                 </div>
               </>
             ) : (
@@ -243,9 +237,9 @@ export default function BudgetPage() {
         </>
       )}
 
-      {/* 分类选择弹窗 */}
+      {/* 分类选择弹窗（无标题，直接展示分类网格） */}
       <Modal open={pickerOpen} onCancel={() => setPickerOpen(false)} footer={null}
-        title={t('budget.pickCategory')} centered width="min(360px, calc(100vw - 32px))">
+        centered width="min(360px, calc(100vw - 32px))">
         <div className="budget-picker-grid">
           {categories.map((cat) => {
             const hasBudget = budgets[cat.name] !== undefined;

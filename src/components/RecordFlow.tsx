@@ -1,13 +1,12 @@
 // 青禾记账 - 记一笔全屏向导（选分类 → 键盘输入金额/日期/备注）
 import { useState } from 'react';
-import { Tag, message, Segmented } from 'antd';
+import { Tag, message } from 'antd';
 import { CloseOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import { addExpense, type TxType } from '../db';
 import { useData } from '../DataContext';
 import { useI18n } from '../i18n/I18nContext';
 import { translateCategory } from '../i18n/categoryTranslations';
-import { incomeCategories } from '../data/categories';
 import CalculatorInput from './CalculatorInput';
 import { useBackBlock } from '../useBackBlock';
 
@@ -19,7 +18,7 @@ interface Props {
 
 export default function RecordFlow({ open, onClose, onSaved }: Props) {
   const { t, lang } = useI18n();
-  const { categories, refresh, setViewMonth } = useData();
+  const { categories, incomeCats, refresh, setViewMonth } = useData();
   const [type, setType] = useState<TxType>('expense');
   const [selectedCat1, setSelectedCat1] = useState('');
   const [selectedCat2, setSelectedCat2] = useState('');
@@ -32,7 +31,7 @@ export default function RecordFlow({ open, onClose, onSaved }: Props) {
 
   if (!open) return null;
 
-  const gridCats = type === 'income' ? incomeCategories : categories;
+  const gridCats = type === 'income' ? incomeCats : categories;
   const currentCategory = gridCats.find((c) => c.name === selectedCat1);
 
   // 键盘标题：显示当前所选分类，确认录入对象
@@ -82,28 +81,23 @@ export default function RecordFlow({ open, onClose, onSaved }: Props) {
   return (
     <div className="record-flow">
       <div className="record-flow-header">
-        <span className="record-flow-title">{type === 'income' ? t('nav.addIncome') : t('nav.add')}</span>
+        <div className="record-flow-types">
+          {(['expense', 'income'] as TxType[]).map((v) => (
+            <button
+              key={v}
+              type="button"
+              className={`record-flow-type-item${type === v ? ' active' : ''}`}
+              onClick={() => {
+                if (v !== type) { setType(v); setSelectedCat1(''); setSelectedCat2(''); }
+              }}
+            >
+              {t(v === 'income' ? 'form.income' : 'form.expense')}
+            </button>
+          ))}
+        </div>
         <button className="record-flow-close" onClick={() => { reset(); onClose(); }} type="button" aria-label={lang === 'zh' ? '关闭' : 'Close'}>
           <CloseOutlined />
         </button>
-      </div>
-
-      {/* 收支切换：默认支出，保持原有记账流程不变 */}
-      <div className="record-flow-type">
-        <Segmented
-          block
-          size="large"
-          value={type}
-          onChange={(v) => {
-            setType(v as TxType);
-            setSelectedCat1('');
-            setSelectedCat2('');
-          }}
-          options={[
-            { label: t('form.expense'), value: 'expense' },
-            { label: t('form.income'), value: 'income' },
-          ]}
-        />
       </div>
 
       <div className="record-flow-body">
