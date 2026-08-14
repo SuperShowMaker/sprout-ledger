@@ -160,6 +160,9 @@ const translations: Record<Lang, Record<string, string>> = {
     'cat.renamed': '已重命名',
     'cat.selectIcon': '图标',
     'cat.preset': '预设',
+    'cat.lockedAria': '已锁定',
+    'cat.deleteAria': '删除',
+    'cat.backAria': '返回',
   },
   en: {
     'app.title': 'Sprout',
@@ -307,5 +310,8 @@ const translations: Record<Lang, Record<string, string>> = {
     'cat.childrenCount': '{n} subcategories',
     'cat.selectIcon': 'Icon',
     'cat.preset': 'Preset',
+    'cat.lockedAria': 'Locked',
+    'cat.deleteAria': 'Delete',
+    'cat.backAria': 'Back',
   },
 };

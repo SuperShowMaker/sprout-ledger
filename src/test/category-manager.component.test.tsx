@@ -5,6 +5,7 @@ import { message } from 'antd';
 import CategoryManager from '../components/CategoryManager';
 import {
   getCategories,
+  addCategory1,
   addCategory2,
   deleteCategory1,
   deleteCategory2,
@@ -55,6 +56,9 @@ vi.mock('../i18n/I18nContext', () => ({
         'cat.cancel': '取消',
         'cat.ok': '确定',
         'list.cancel': '取消',
+        'cat.lockedAria': '已锁定',
+        'cat.deleteAria': '删除',
+        'cat.backAria': '返回',
       };
       return map[k] ?? k;
     },
@@ -111,12 +115,12 @@ describe('CategoryManager 网格与角标', () => {
   it('一级网格：预设格有锁角标无删除，自定义格有红✕删除角标，末尾有＋格', async () => {
     render(<CategoryManager open onClose={() => {}} onChanged={() => {}} />);
     const presetCell = (await screen.findByText('餐饮饮食')).closest('.catmgr-cell')! as HTMLElement;
-    expect(within(presetCell).getByLabelText('locked')).toBeTruthy();
-    expect(within(presetCell).queryByLabelText('delete')).toBeNull();
+    expect(within(presetCell).getByLabelText('已锁定')).toBeTruthy();
+    expect(within(presetCell).queryByLabelText('删除')).toBeNull();
 
     const customCell = screen.getByText('我的分类').closest('.catmgr-cell')! as HTMLElement;
-    expect(within(customCell).getByLabelText('delete')).toBeTruthy();
-    expect(within(customCell).queryByLabelText('locked')).toBeNull();
+    expect(within(customCell).getByLabelText('删除')).toBeTruthy();
+    expect(within(customCell).queryByLabelText('已锁定')).toBeNull();
 
     expect(screen.getByRole('button', { name: /添加类别$/ })).toBeTruthy();
   });
@@ -124,7 +128,7 @@ describe('CategoryManager 网格与角标', () => {
   it('红✕删除一级分类 → 两步确认 → deleteCategory1', async () => {
     render(<CategoryManager open onClose={() => {}} onChanged={() => {}} />);
     const cell = (await screen.findByText('我的分类')).closest('.catmgr-cell')! as HTMLElement;
-    fireEvent.click(within(cell).getByLabelText('delete'));
+    fireEvent.click(within(cell).getByLabelText('删除'));
     await screen.findByText('删除后不可恢复');
     fireEvent.click(screen.getByText('确认删除'));
     await waitFor(() => expect(deleteCategory1).toHaveBeenCalledWith('我的分类'));
@@ -135,11 +139,11 @@ describe('CategoryManager 网格与角标', () => {
     fireEvent.click(await screen.findByText('餐饮饮食'));
 
     const presetSub = (await screen.findByText('早餐')).closest('.catmgr-sub-cell')! as HTMLElement;
-    expect(within(presetSub).getByLabelText('locked')).toBeTruthy();
-    expect(within(presetSub).queryByLabelText('delete')).toBeNull();
+    expect(within(presetSub).getByLabelText('已锁定')).toBeTruthy();
+    expect(within(presetSub).queryByLabelText('删除')).toBeNull();
 
     const customSub = screen.getByText('自定义小吃').closest('.catmgr-sub-cell')! as HTMLElement;
-    fireEvent.click(within(customSub).getByLabelText('delete'));
+    fireEvent.click(within(customSub).getByLabelText('删除'));
     await screen.findByText('删除后不可恢复');
     fireEvent.click(screen.getByText('确认删除'));
     await waitFor(() => expect(deleteCategory2).toHaveBeenCalledWith('自定义小吃', '餐饮饮食'));
@@ -169,6 +173,20 @@ describe('CategoryManager 网格与角标', () => {
     await waitFor(() => expect(addCategory2).toHaveBeenCalledWith('夜宵', '餐饮饮食'));
   });
 
+  it('B8 内联添加：IME 组合 Enter 不提交，普通 Enter 提交 addCategory2', async () => {
+    render(<CategoryManager open onClose={() => {}} onChanged={() => {}} />);
+    fireEvent.click(await screen.findByText('餐饮饮食'));
+    fireEvent.click(await screen.findByText('添加子类别'));
+    const input = screen.getByPlaceholderText('子类别名称');
+    fireEvent.change(input, { target: { value: '夜宵' } });
+    fireEvent.keyDown(input, { key: 'Enter', keyCode: 229 });
+    fireEvent.keyUp(input, { key: 'Enter', keyCode: 229 });
+    expect(addCategory2).not.toHaveBeenCalled();
+    fireEvent.keyDown(input, { key: 'Enter', keyCode: 13 });
+    fireEvent.keyUp(input, { key: 'Enter', keyCode: 13 });
+    await waitFor(() => expect(addCategory2).toHaveBeenCalledWith('夜宵', '餐饮饮食'));
+  });
+
   it('跨父类重名的子分类不被锁定（自定义父类下「早餐」有红✕无锁）', async () => {
     vi.mocked(getCategories).mockImplementation(async (type?: string) =>
       type === 'income' ? INCOME_CATS : [{ name: '我的分类', icon: '📦', children: ['早餐'] }]
@@ -176,8 +194,18 @@ describe('CategoryManager 网格与角标', () => {
     render(<CategoryManager open onClose={() => {}} onChanged={() => {}} />);
     fireEvent.click(await screen.findByText('我的分类'));
     const sub = (await screen.findByText('早餐')).closest('.catmgr-sub-cell')! as HTMLElement;
-    expect(within(sub).getByLabelText('delete')).toBeTruthy();
-    expect(within(sub).queryByLabelText('locked')).toBeNull();
+    expect(within(sub).getByLabelText('删除')).toBeTruthy();
+    expect(within(sub).queryByLabelText('已锁定')).toBeNull();
+  });
+
+  it('badge 按下不进拖拽：pointerdown/move 落在 ✕ 上不触发 cell dragging 态（保证删除点击不被 setPointerCapture 吞掉）', async () => {
+    render(<CategoryManager open onClose={() => {}} onChanged={() => {}} />);
+    const cell = (await screen.findByText('我的分类')).closest('.catmgr-cell')! as HTMLElement;
+    const badge = within(cell).getByLabelText('删除');
+    fireEvent.pointerDown(badge, { pointerId: 1, button: 0, clientX: 50, clientY: 50 });
+    fireEvent.pointerMove(badge, { pointerId: 1, clientX: 100, clientY: 100 });
+    expect(cell.classList.contains('dragging')).toBe(false);
+    fireEvent.pointerUp(badge, { pointerId: 1 });
   });
 });
 
@@ -198,6 +226,29 @@ describe('CategoryManager 添加面板', () => {
     expect(await screen.findByText('名称已存在')).toBeTruthy();
     expect(screen.getByPlaceholderText('类别名称')).toBeTruthy();
     expect(message.warning).not.toHaveBeenCalled();
+  });
+
+  it('B6 跨 type 查重：支出 tab 添加与收入预设同名「工资收入」→ 内联报错，不调用 addCategory1', async () => {
+    render(<CategoryManager open onClose={() => {}} onChanged={() => {}} />);
+    fireEvent.click(await screen.findByText('添加类别'));
+    const input = screen.getByPlaceholderText('类别名称');
+    fireEvent.change(input, { target: { value: '工资收入' } });
+    fireEvent.click(screen.getByRole('button', { name: '完成' }));
+    expect(await screen.findByText('名称已存在')).toBeTruthy();
+    expect(addCategory1).not.toHaveBeenCalled();
+  });
+
+  it('B8 添加面板：IME 组合 Enter（keyCode 229）不提交，普通 Enter 提交 addCategory1', async () => {
+    render(<CategoryManager open onClose={() => {}} onChanged={() => {}} />);
+    fireEvent.click(await screen.findByText('添加类别'));
+    const input = screen.getByPlaceholderText('类别名称');
+    fireEvent.change(input, { target: { value: '宠物' } });
+    fireEvent.keyDown(input, { key: 'Enter', keyCode: 229 });
+    fireEvent.keyUp(input, { key: 'Enter', keyCode: 229 });
+    expect(addCategory1).not.toHaveBeenCalled();
+    fireEvent.keyDown(input, { key: 'Enter', keyCode: 13 });
+    fireEvent.keyUp(input, { key: 'Enter', keyCode: 13 });
+    await waitFor(() => expect(addCategory1).toHaveBeenCalledWith('宠物', '📦', 'expense'));
   });
 
   it('添加面板标题按收支区分：支出 →「添加支出类别」', async () => {

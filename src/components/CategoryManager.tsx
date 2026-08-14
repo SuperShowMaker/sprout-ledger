@@ -67,6 +67,12 @@ export default function CategoryManager({ open, onClose, onChanged }: Props) {
   const [inlineValue, setInlineValue] = useState('');
   const [inlineError, setInlineError] = useState('');
 
+  // B4 新类滚动定位：记录刚添加的项，渲染后滚动 + 高亮
+  const [highlight, setHighlight] = useState<{ name: string; parent?: string } | null>(null);
+  const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 无障碍：记录面板触发元素，关闭时把焦点还回去
+  const lastFocus = useRef<HTMLElement | null>(null);
+
   // 拖拽排序状态（pointer 自定义拖拽：绕过 HTML5 DnD，WebView 兼容）
   // dragRef/dropTargetRef 供事件回调同步读取（pointermove/up 紧跟状态变化，避免 React state 异步读到旧值）
   const [dragName, setDragName] = useState<string | null>(null);     // 渲染：被拖项
@@ -88,9 +94,47 @@ export default function CategoryManager({ open, onClose, onChanged }: Props) {
     setIncomeCats(inc);
   };
 
+  // 无障碍/IME 守卫：纯辅助，早于早退定义（避免 hooks 闭包引用未声明 const）
+  const guardEnter = (fn: () => void) => (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+    fn();
+  };
+  const rememberFocus = () => { lastFocus.current = document.activeElement as HTMLElement | null; };
+  const closeSheet = () => { setSheet(null); lastFocus.current?.focus(); };
+
   useEffect(() => {
     if (open) { load(); setTab('expense'); setSelectedCat1(null); setSheet(null); resetDrag(); }
   }, [open]);
+
+  // B4：提交成功后滚动到新 cell 并短暂高亮（900ms 后移除）
+  useEffect(() => {
+    if (!highlight) return;
+    const el = highlight.parent
+      ? Array.from(document.querySelectorAll('.catmgr-sub-cell')).find((n) =>
+          (n as HTMLElement).dataset.name === highlight.name && (n as HTMLElement).dataset.parent === highlight.parent)
+      : Array.from(document.querySelectorAll('.catmgr-cell')).find((n) => (n as HTMLElement).dataset.name === highlight.name);
+    if (!el) return;
+    el.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+    el.classList.add('catmgr-highlight');
+    highlightTimer.current = setTimeout(() => {
+      el.classList.remove('catmgr-highlight');
+      setHighlight(null);
+    }, 900);
+    return () => { if (highlightTimer.current) clearTimeout(highlightTimer.current); };
+  }, [highlight]);
+
+  // 无障碍：Esc 优先关面板/确认视图，其次退出页面（与返回键同序）
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (sheet) setSheet(null);
+        else onClose();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, sheet]);
 
   // 返回键：优先关面板/确认视图，其次退出页面
   useBackBlock(open, () => { if (sheet) setSheet(null); else onClose(); });
@@ -102,6 +146,7 @@ export default function CategoryManager({ open, onClose, onChanged }: Props) {
 
   // ============ 添加（全屏面板：仅一级/收入；子类别走内联） ============
   const openAdd = (kind: CatKind) => {
+    rememberFocus();
     setInputValue('');
     setInputError('');
     // 图标沿用上次选择（会话内），避免连续添加全是默认 📦
@@ -112,12 +157,14 @@ export default function CategoryManager({ open, onClose, onChanged }: Props) {
     if (!sheet || sheet.mode !== 'add') return;
     const name = inputValue.trim();
     if (!name) return;
-    const list = currentCats.map((c) => c.name);
-    if (list.includes(name)) { setInputError(t('cat.nameExists')); return; }
+    // 收支分类名跨 type 全局唯一（DB categories1.name UNIQUE 不区分 type），添加时同时查两套列表
+    const nameExists = expenseCats.some((c) => c.name === name) || incomeCats.some((c) => c.name === name);
+    if (nameExists) { setInputError(t('cat.nameExists')); return; }
     await addCategory1(name, inputIcon, sheet.kind === 'income' ? 'income' : 'expense');
     message.success(t('cat.added'));
-    setSheet(null);
+    closeSheet();
     await load();
+    setHighlight({ name, parent: undefined });
     onChanged();
   };
 
@@ -133,10 +180,13 @@ export default function CategoryManager({ open, onClose, onChanged }: Props) {
     setInlineError('');
     setInlineAdd(false);
     await load();
+    setHighlight({ name, parent: selectedCat1 });
+    lastFocus.current?.focus();
     onChanged();
   };
 
   const openInline = () => {
+    rememberFocus();
     setInlineValue('');
     setInlineError('');
     setInlineAdd(true);
@@ -144,6 +194,7 @@ export default function CategoryManager({ open, onClose, onChanged }: Props) {
 
   // ============ 删除（面板内两步确认） ============
   const requestDelete = async (kind: CatKind, name: string, parent?: string) => {
+    rememberFocus();
     const count = await countExpensesByCategory(kind === 'cat2' ? parent! : name, kind === 'cat2' ? name : undefined);
     setSheet({ mode: 'confirm-delete', kind, name, parent, count });
   };
@@ -155,7 +206,7 @@ export default function CategoryManager({ open, onClose, onChanged }: Props) {
       if (sheet.kind === 'cat2') await deleteCategory2(sheet.name, sheet.parent!);
       else await deleteCategory1(sheet.name);
       message.success(t(sheet.count > 0 ? 'cat.deletedWithRecords' : 'cat.deleted'));
-      setSheet(null);
+      closeSheet();
       await load();
       onChanged();
     } catch (err) {
@@ -193,6 +244,8 @@ export default function CategoryManager({ open, onClose, onChanged }: Props) {
 
   const handlePointerDown = (e: React.PointerEvent, item: DragState) => {
     if (e.button !== 0) return; // 仅鼠标左键 / 触屏单点
+    // 角标按下不进拖拽：避免 setPointerCapture 把 click 重定向到 cell、吞掉按钮点击
+    if ((e.target as HTMLElement).closest('.catmgr-badge')) return;
     dragRef.current = item;
     startPosRef.current = { x: e.clientX, y: e.clientY };
     // 锁定指针到该元素，保证快速拖动不丢事件
@@ -281,12 +334,12 @@ export default function CategoryManager({ open, onClose, onChanged }: Props) {
   // 角标：锁定（纯展示）/ 红✕删除（点击 → 两步确认）
   const badge = (kind: CatKind, name: string, parent?: string) =>
     isLocked(kind, name, parent) ? (
-      <span className="catmgr-badge lock" aria-label="locked"><LockOutlined /></span>
+      <span className="catmgr-badge lock" aria-label={t('cat.lockedAria')}><LockOutlined /></span>
     ) : (
       <button
         type="button"
         className="catmgr-badge del"
-        aria-label="delete"
+        aria-label={t('cat.deleteAria')}
         onClick={(e) => { e.stopPropagation(); requestDelete(kind, name, parent); }}
       >
         <CloseOutlined />
@@ -307,7 +360,7 @@ export default function CategoryManager({ open, onClose, onChanged }: Props) {
     <div className="catmgr-page">
       {/* 顶栏 */}
       <header className="catmgr-header">
-        <button type="button" className="catmgr-back" onClick={onClose} aria-label="back"><LeftOutlined /></button>
+        <button type="button" className="catmgr-back" onClick={onClose} aria-label={t('cat.backAria')}><LeftOutlined /></button>
         <span className="catmgr-title">{t('cat.title')}</span>
         <span style={{ width: 32 }} />
       </header>
@@ -383,7 +436,7 @@ export default function CategoryManager({ open, onClose, onChanged }: Props) {
                     value={inlineValue}
                     status={inlineError ? 'error' : undefined}
                     onChange={(e) => { setInlineValue(e.target.value); if (inlineError) setInlineError(''); }}
-                    onPressEnter={submitInline}
+                    onPressEnter={guardEnter(submitInline)}
                     maxLength={12}
                     autoFocus
                   />
@@ -405,8 +458,8 @@ export default function CategoryManager({ open, onClose, onChanged }: Props) {
       {/* 删除确认底部面板 */}
       {sheet?.mode === 'confirm-delete' && (
         <>
-          <div className="sheet-mask" onClick={() => setSheet(null)} />
-          <div className="sheet-panel">
+          <div className="sheet-mask" onClick={closeSheet} />
+          <div className="sheet-panel" role="dialog" aria-modal="true">
             <div className="sheet-grabber" />
             <div className="sheet-confirm">
               <div className="sheet-confirm-icon"><DeleteOutlined /></div>
@@ -417,7 +470,7 @@ export default function CategoryManager({ open, onClose, onChanged }: Props) {
                   : t('cat.deleteSimpleContent')}
               </p>
               <div className="sheet-btn-row">
-                <button type="button" className="sheet-btn ghost" onClick={() => setSheet(null)}>
+                <button type="button" className="sheet-btn ghost" onClick={closeSheet}>
                   {t('list.cancel')}
                 </button>
                 <button type="button" className="sheet-btn danger" disabled={deleting} onClick={executeDelete}>
@@ -431,9 +484,9 @@ export default function CategoryManager({ open, onClose, onChanged }: Props) {
 
       {/* 添加类别全屏面板：上半固定（大图标预览 + 类别名称），下半滚动（分组 emoji） */}
       {sheet?.mode === 'add' && (
-        <div className="addcat-page">
+        <div className="addcat-page" role="dialog" aria-modal="true">
           <header className="addcat-header">
-            <button type="button" className="addcat-cancel" onClick={() => setSheet(null)}>{t('cat.cancel')}</button>
+            <button type="button" className="addcat-cancel" onClick={closeSheet}>{t('cat.cancel')}</button>
             <span className="addcat-title">{addTitle()}</span>
             <button
               type="button"
@@ -451,7 +504,7 @@ export default function CategoryManager({ open, onClose, onChanged }: Props) {
                 value={inputValue}
                 status={inputError ? 'error' : undefined}
                 onChange={(e) => { setInputValue(e.target.value); if (inputError) setInputError(''); }}
-                onPressEnter={submitAdd}
+                onPressEnter={guardEnter(submitAdd)}
                 maxLength={12}
                 autoFocus
                 prefix={inputIcon}

@@ -800,6 +800,12 @@ body {
 /* 拖拽插入位置指示：顶部 / 底部绿色横条 */
 .catmgr-cell.drop-before { box-shadow: inset 0 3px 0 var(--brand); }
 .catmgr-cell.drop-after { box-shadow: inset 0 -3px 0 var(--brand); }
+/* 新类添加成功：滚动定位后短暂高亮脉冲（同源 brand token，深色自动映射） */
+.catmgr-highlight { animation: catmgr-highlight 0.9s ease; }
+@keyframes catmgr-highlight {
+  0%   { background: var(--brand-bg); box-shadow: 0 0 0 2px var(--brand); }
+  100% { background: transparent; box-shadow: none; }
+}
 .catmgr-cell-icon { font-size: 26px; line-height: 1; }
 .catmgr-cell-name {
   font-size: 11px; color: #666;
