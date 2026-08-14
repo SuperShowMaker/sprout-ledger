@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "android:build": "node scripts/android-build.mjs"
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.2",
