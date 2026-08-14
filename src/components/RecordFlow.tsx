@@ -8,6 +8,7 @@ import { useData } from '../DataContext';
 import { useI18n } from '../i18n/I18nContext';
 import { translateCategory } from '../i18n/categoryTranslations';
 import CalculatorInput from './CalculatorInput';
+import { getAudioCtx, synthesizeCoin } from '../keyFeedback';
 import { useBackBlock } from '../useBackBlock';
 
 interface Props {
@@ -17,7 +18,7 @@ interface Props {
 }
 
 export default function RecordFlow({ open, onClose, onSaved }: Props) {
-  const { t, lang } = useI18n();
+  const { t, lang, keySound } = useI18n();
   const { categories, incomeCats, refresh, setViewMonth } = useData();
   const [type, setType] = useState<TxType>('expense');
   const [selectedCat1, setSelectedCat1] = useState('');
@@ -68,6 +69,11 @@ export default function RecordFlow({ open, onClose, onSaved }: Props) {
         note: note.trim(),
       });
       message.success(t('form.saveSuccess'));
+      // 入账成功音（金币叮）：落库成功才响，✓ 键本身静音只震动
+      if (keySound) {
+        const ctx = getAudioCtx();
+        if (ctx) synthesizeCoin(ctx);
+      }
       setViewMonth(date.startOf('month'));
       refresh();
       reset();

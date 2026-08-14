@@ -663,11 +663,13 @@ body {
   font-size: 22px; font-weight: 500;
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  transition: background-color 0.1s ease;
+  transition: background-color 0.1s ease, transform 0.1s ease;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
   touch-action: manipulation; /* 长按退格时避免触发缩放/滚动 */
 }
+/* 按压微缩放：与变色叠加，iOS 计算器式反馈（回弹由 transition 提供） */
+.calc-key:active { transform: scale(0.94); }
 
 /* 数字键 */
 .key-num { background: #fff; color: #333; }

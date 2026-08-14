@@ -5,6 +5,7 @@ import dayjs, { Dayjs } from 'dayjs';
 import { useI18n } from '../i18n/I18nContext';
 import { evaluate, canAppendDot, isOperator } from '../calculator';
 import { createHoldRepeater, type HoldRepeater } from '../holdRepeat';
+import { synthesizeTick, vibrate, getAudioCtx, type KeySoundType } from '../keyFeedback';
 
 interface Props {
   visible: boolean;
@@ -31,17 +32,25 @@ interface Props {
 }
 
 export default function CalculatorInput({ visible, initialValue, onConfirm, onCancel, embedded, label, title, subtitle, max, onClear, note, date, onNoteChange, onDateChange }: Props) {
-  const { t } = useI18n();
+  const { t, keySound, keyVibrate } = useI18n();
   const [expr, setExpr] = useState('');
   // 超限提示节流：避免连按超限数字时每次按键都重置 toast 计时器导致长时间停留
   const lastMaxToast = useRef(0);
 
-  // 按键震动（仅移动端支持时生效，桌面端自动跳过）
-  const vibrate = useCallback(() => {
-    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-      try { navigator.vibrate(10); } catch { /* 不支持的环境忽略 */ }
+  // 统一反馈入口：type 为 null 时只震动不发声（确认键静音——成功反馈由保存落库后的金币叮承担）
+  const feedback = useCallback((type: KeySoundType | null) => {
+    if (type !== null && keySound) {
+      const ctx = getAudioCtx();
+      if (ctx) synthesizeTick(ctx, type);
     }
-  }, []);
+    if (keyVibrate) vibrate(10);
+  }, [keySound, keyVibrate]);
+
+  // 供长生命周期闭包（holdRepeater）取最新反馈函数，避免开关切换后仍用旧引用
+  const feedbackRef = useRef(feedback);
+  feedbackRef.current = feedback;
+  const keyVibrateRef = useRef(keyVibrate);
+  keyVibrateRef.current = keyVibrate;
 
   useEffect(() => {
     if (visible) {
@@ -70,6 +79,7 @@ export default function CalculatorInput({ visible, initialValue, onConfirm, onCa
     if (max !== undefined) {
       const val = evaluate(candidate);
       if (val !== null && val > max) {
+        feedback('error');
         const now = Date.now();
         if (now - lastMaxToast.current > 2000) {
           lastMaxToast.current = now;
@@ -79,7 +89,7 @@ export default function CalculatorInput({ visible, initialValue, onConfirm, onCa
       }
     }
     setExpr(candidate);
-  }, [expr, max]);
+  }, [expr, max, feedback]);
 
   const backspace = useCallback(() => {
     setExpr((prev) => prev.slice(0, -1));
@@ -87,16 +97,27 @@ export default function CalculatorInput({ visible, initialValue, onConfirm, onCa
 
   // 长按退格连删：按下立即删一个，300ms 后以 50ms 间隔连删，松开/移出/取消或卸载时停止
   const holdRepeatRef = useRef<HoldRepeater | null>(null);
+  // 连删 tick 计数：首 tick（单击）有完整反馈，后续连删仅震动（静音避免连续噪音）
+  const backspaceTickRef = useRef(0);
   if (holdRepeatRef.current === null) {
     holdRepeatRef.current = createHoldRepeater({
       delay: 300,
       interval: 50,
-      onTick: () => { backspace(); vibrate(); },
+      onTick: () => {
+        backspace();
+        if (backspaceTickRef.current === 0) {
+          feedbackRef.current('fn');
+        } else if (keyVibrateRef.current) {
+          vibrate(10);
+        }
+        backspaceTickRef.current += 1;
+      },
     });
   }
 
   const stopHoldRepeat = useCallback(() => {
     holdRepeatRef.current?.stop();
+    backspaceTickRef.current = 0;
   }, []);
 
   // 组件卸载时兜底清理
@@ -108,10 +129,10 @@ export default function CalculatorInput({ visible, initialValue, onConfirm, onCa
     holdRepeatRef.current?.start();
   }, []);
 
-  const handleKeyClick = useCallback((action: () => void) => () => {
-    vibrate();
+  const handleKeyClick = useCallback((kind: KeySoundType | null, action: () => void) => () => {
+    feedback(kind);
     action();
-  }, [vibrate]);
+  }, [feedback]);
 
   const clear = useCallback(() => {
     setExpr('');
@@ -139,6 +160,8 @@ export default function CalculatorInput({ visible, initialValue, onConfirm, onCa
   interface KeySpec {
     label: string;
     className: string;
+    /** 按键音效类型；缺省则只震动不发声 */
+    kind?: KeySoundType;
     action?: () => void;
     onPointerDown?: (e: React.PointerEvent<HTMLButtonElement>) => void;
     onPointerUp?: () => void;
@@ -148,23 +171,24 @@ export default function CalculatorInput({ visible, initialValue, onConfirm, onCa
   }
 
   const keys: KeySpec[] = [
-    { label: '7', action: () => append('7'), className: 'key-num' },
-    { label: '8', action: () => append('8'), className: 'key-num' },
-    { label: '9', action: () => append('9'), className: 'key-num' },
-    { label: 'C', action: clear, className: 'key-fn' },
-    { label: '4', action: () => append('4'), className: 'key-num' },
-    { label: '5', action: () => append('5'), className: 'key-num' },
-    { label: '6', action: () => append('6'), className: 'key-num' },
-    { label: '+', action: () => append('+'), className: 'key-op key-add' },
-    { label: '1', action: () => append('1'), className: 'key-num' },
-    { label: '2', action: () => append('2'), className: 'key-num' },
-    { label: '3', action: () => append('3'), className: 'key-num' },
-    { label: '−', action: () => append('-'), className: 'key-op key-sub' },
-    { label: '.', action: () => append('.'), className: 'key-num' },
-    { label: '0', action: () => append('0'), className: 'key-num' },
+    { label: '7', action: () => append('7'), className: 'key-num', kind: 'num' },
+    { label: '8', action: () => append('8'), className: 'key-num', kind: 'num' },
+    { label: '9', action: () => append('9'), className: 'key-num', kind: 'num' },
+    { label: 'C', action: clear, className: 'key-fn', kind: 'fn' },
+    { label: '4', action: () => append('4'), className: 'key-num', kind: 'num' },
+    { label: '5', action: () => append('5'), className: 'key-num', kind: 'num' },
+    { label: '6', action: () => append('6'), className: 'key-num', kind: 'num' },
+    { label: '+', action: () => append('+'), className: 'key-op key-add', kind: 'num' },
+    { label: '1', action: () => append('1'), className: 'key-num', kind: 'num' },
+    { label: '2', action: () => append('2'), className: 'key-num', kind: 'num' },
+    { label: '3', action: () => append('3'), className: 'key-num', kind: 'num' },
+    { label: '−', action: () => append('-'), className: 'key-op key-sub', kind: 'num' },
+    { label: '.', action: () => append('.'), className: 'key-num', kind: 'num' },
+    { label: '0', action: () => append('0'), className: 'key-num', kind: 'num' },
     {
       label: '⌫',
       className: 'key-fn',
+      kind: 'fn',
       onPointerDown: handleBackspacePointerDown,
       onPointerUp: stopHoldRepeat,
       onPointerLeave: stopHoldRepeat,
@@ -212,7 +236,7 @@ export default function CalculatorInput({ visible, initialValue, onConfirm, onCa
         <button
           key={k.label}
           className={`calc-key ${k.className}`}
-          onClick={k.action ? handleKeyClick(k.action) : undefined}
+          onClick={k.action ? handleKeyClick(k.kind ?? null, k.action) : undefined}
           onPointerDown={k.onPointerDown}
           onPointerUp={k.onPointerUp}
           onPointerLeave={k.onPointerLeave}

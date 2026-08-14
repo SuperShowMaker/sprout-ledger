@@ -18,7 +18,7 @@ import { isDebugMode, setDebugMode as _setDebugMode } from '../debug';
 type ExportMode = 'all' | 'year' | 'month' | 'week' | 'range';
 
 export default function Profile() {
-  const { t, lang, darkMode, toggleLang, toggleDark } = useI18n();
+  const { t, lang, darkMode, keySound, keyVibrate, toggleLang, toggleDark, toggleKeySound, toggleKeyVibrate } = useI18n();
   const { modal } = App.useApp();
   const { refresh } = useData();
   const [catManagerOpen, setCatManagerOpen] = useState(false);
@@ -141,6 +141,8 @@ export default function Profile() {
   const menuItems = [
     { key: 'lang', icon: <GlobalOutlined />, label: (<div className="profile-row"><span>{lang === 'zh' ? '语言 / Language' : 'Language'}</span><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ color: '#999', fontSize: 13 }}>{lang === 'zh' ? '中文' : 'English'}</span><Switch checked={lang === 'en'} onChange={toggleLang} size="small" /></div></div>), },
     { key: 'darkMode', icon: <span style={{ fontSize: 18 }}>{darkMode ? '🌙' : '☀️'}</span>, label: (<div className="profile-row"><span>{lang === 'zh' ? '深色模式' : 'Dark Mode'}</span><Switch checked={darkMode} onChange={() => toggleDark()} size="small" /></div>), },
+    { key: 'keySound', icon: <span style={{ fontSize: 18 }}>{keySound ? '🔊' : '🔇'}</span>, label: (<div className="profile-row"><span>{lang === 'zh' ? '键盘音效' : 'Key Sound'}</span><Switch checked={keySound} onChange={() => toggleKeySound()} size="small" /></div>), },
+    { key: 'keyVibrate', icon: <span style={{ fontSize: 18 }}>{keyVibrate ? '📳' : '📴'}</span>, label: (<div className="profile-row"><span>{lang === 'zh' ? '键盘震动' : 'Key Vibration'}</span><Switch checked={keyVibrate} onChange={() => toggleKeyVibrate()} size="small" /></div>), },
     { key: 'export', icon: <DownloadOutlined />, label: (<div className="profile-row" onClick={() => setExportVisible(true)}><span>{lang === 'zh' ? '导出数据' : 'Export Data'}</span><span style={{ color: '#bbb' }}>›</span></div>), },
     { key: 'import', icon: <UploadOutlined />, label: (<div className="profile-row" onClick={handleImport}><span>{lang === 'zh' ? '导入数据' : 'Import Data'}</span><span style={{ color: '#bbb' }}>›</span></div>), },
     { key: 'categories', icon: <SettingOutlined />, label: (<div className="profile-row" onClick={() => setCatManagerOpen(true)}><span>{t('form.manageCategory')}</span><span style={{ color: '#bbb' }}>›</span></div>), },
