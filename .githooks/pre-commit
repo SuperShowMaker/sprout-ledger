@@ -1,0 +1,8 @@
+#!/bin/sh
+# doc-sync: 提交时自动同步文档派生事实（测试数/版本/进度条/✅锚点翻转）
+# 同步是装饰层：脚本失败不阻塞提交，可手动 `npm run audit` 排查。
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+node "$ROOT/scripts/doc-sync.mjs" 2>&1 || {
+  echo "doc-sync: 同步失败（提交继续；可运行 npm run audit 排查）" >&2
+}
+exit 0

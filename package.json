@@ -10,6 +10,7 @@
     "tauri": "tauri",
     "test": "vitest run",
     "test:watch": "vitest",
+    "audit": "node scripts/doc-sync.mjs --check",
     "android:build": "node scripts/android-build.mjs"
   },
   "dependencies": {

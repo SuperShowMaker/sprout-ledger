@@ -7,7 +7,7 @@
 ```bash
 npm run tauri dev              # 桌面端
 npm run tauri android dev      # 手机端
-npm test                       # 188 个测试用例
+npm test                       # 用例数以 vitest 为准（pre-commit 自动同步）
 ```
 
 个人轻量收支记账，Windows + Android，本地 SQLite，无需联网。
@@ -88,4 +88,5 @@ src-tauri/
 ## 开发与沟通
 
 - **热更新**：前端改动自动刷新。只有 Rust / Cargo.toml / tauri.conf.json / capabilities 改了才需重启
+- **文档同步**：pre-commit 钩子（`.githooks/`）自动同步派生事实——测试数/版本/进度条/✅锚点翻转，只改写 `<!-- @audit:... -->` 标记，不碰自由正文。功能落地时把 PRD 对应行 ⏸ 改 ✅ 并确保说明带证明锚点（引用 `src/` 下的路径或测试文件）；版本只改 `src-tauri/tauri.conf.json` 一处。验证基线：`tsc --noEmit` + `npx vitest run` + `npm run audit`
 - 技术方案列出选项，用户拍板；一次只抛一个决策点
