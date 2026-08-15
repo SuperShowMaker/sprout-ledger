@@ -123,9 +123,9 @@ export async function initDatabase(): Promise<Database> {
     throw new Error(`数据库损坏: ${String(e)}`);
   }
 
-  // 首次使用时导入默认分类
+  // 首次使用时导入默认分类（只数支出分类：收入预设先入库，全表计数恒非 0，新库会漏种支出分类）
   const count = await db.select<[{ cnt: number }]>(
-    'SELECT COUNT(*) as cnt FROM categories1'
+    "SELECT COUNT(*) as cnt FROM categories1 WHERE type = 'expense'"
   );
   if (count[0]?.cnt === 0) {
     for (let i = 0; i < defaultCategories.length; i++) {
