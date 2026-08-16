@@ -40,6 +40,15 @@ function gitAdd(paths) {
   try { execFileSync('git', ['add', '--', ...paths], { cwd: ROOT, stdio: 'ignore' }); } catch { /* 忽略 */ }
 }
 
+// 暂存区新增（A 状态）的文件路径列表
+function gitAdded() {
+  try {
+    return execFileSync('git', ['diff', '--cached', '--name-status'], { cwd: ROOT, encoding: 'utf8' })
+      .split('\n').map((s) => s.trim()).filter((l) => l && /^A\s/.test(l))
+      .map((l) => l.replace(/^A\s+/, ''));
+  } catch { return []; }
+}
+
 /* ---------- 派生事实 ---------- */
 
 // ① 测试数：直接跑 vitest.mjs（绕开 Windows 的 npx/npm .cmd shim）解析 "Tests  N passed"。失败返回 null（跳过，不阻塞）。
@@ -118,6 +127,14 @@ function syncVersion(staged) {
   const next = text.replace(MARK_VER, `v${v}<!-- @audit:version -->`);
   if (next !== text) { write(f, next); changed.push(f); }
   return 0;
+}
+
+// guardrail：本次提交新增 src/ 代码但未同时暂存 PRD/README → 提醒刷新文档（只警告不阻塞，防"忘了刷文档"）
+function guardrailDoc(staged) {
+  const adds = gitAdded().filter((p) => p.startsWith('src/'));
+  if (!adds.length) return;
+  if (staged.some((p) => p === 'PRD.md' || p === 'README.md')) return;
+  warn(`[guardrail] 新增 ${adds.length} 个 src/ 文件但未同时暂存 PRD.md/README.md，疑似漏刷新文档 —— 可用 /commit 让 AI 判断并补正文`);
 }
 
 /* ---------- PRD 进度条 + 锚点 + ✅ 翻转 ---------- */
@@ -233,6 +250,7 @@ function main() {
     // 同步模式：事件驱动派生 + 改写 + 锚点警告
     syncTestCount(staged);
     syncVersion(staged);
+    guardrailDoc(staged);
     prd = syncProgress(prd);
     anchorAndFlip(prd, staged, true);
     checkPaths();

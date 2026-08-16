@@ -88,5 +88,6 @@ src-tauri/
 ## 开发与沟通
 
 - **热更新**：前端改动自动刷新。只有 Rust / Cargo.toml / tauri.conf.json / capabilities 改了才需重启
-- **文档同步**：pre-commit 钩子（`.githooks/`）自动同步派生事实——测试数/版本/进度条/✅锚点翻转，只改写 `<!-- @audit:... -->` 标记，不碰自由正文。功能落地时把 PRD 对应行 ⏸ 改 ✅ 并确保说明带证明锚点（引用 `src/` 下的路径或测试文件）；版本只改 `src-tauri/tauri.conf.json` 一处。验证基线：`tsc --noEmit` + `npx vitest run` + `npm run audit`
+- **文档同步**：pre-commit 钩子（`.githooks/`）自动同步派生事实——测试数/版本/进度条/✅锚点翻转，只改写 `<!-- @audit:... -->` 标记，不碰自由正文。功能落地时把 PRD 对应行 ⏸ 改 ✅ 并确保说明带证明锚点（引用 `src/` 下的路径或测试文件）；版本只改 `src-tauri/tauri.conf.json` 一处。提交新增 `src/` 文件却未带 PRD/README 改动时，打 ⚠ 漏刷新提醒（guardrail，不阻塞）。验证基线：`tsc --noEmit` + `npx vitest run` + `npm run audit`
+- **斜杠命令**：`.claude/commands/` 下 `/commit`（刷新文档→验证→提交→推送）、`/run-dev [desktop|android]`（本地运行）、`/apk-pack`（安卓一键出包）、`/bump [major|minor|patch]`（版本号提升）；手动触发，重启会话后生效
 - 技术方案列出选项，用户拍板；一次只抛一个决策点
