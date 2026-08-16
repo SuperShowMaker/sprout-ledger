@@ -16,9 +16,15 @@ description: 刷新相关文档后提交到本地并推送到远端（当前分�
 
 4. **暂存**：`git add -A`
 
-5. **同步派生事实**：`node scripts/doc-sync.mjs`（此时 src/test/ 已在暂存区 → 会重算测试数；版本/进度条/⏸→✅ 一并同步，doc-sync 自行 git add）
+5. **同步派生事实**：`node scripts/doc-sync.mjs`（src/test/ 已暂存 → 重算测试数并写缓存；版本/进度条/⏸→✅ 一并同步，doc-sync 自行 git add）
 
-6. **验证基线**：`npx tsc --noEmit` + `npx vitest run` + `npm run audit`。任一失败 → 停下报告错误原文，不提交。
+6. **验证基线**（按改动范围分流）：
+   - 本次提交含 `src/` 变更：
+     a. 并行跑 `npx tsc --noEmit` 与 `npx vitest run`，从 vitest 输出解析 `Tests N passed` 得 N
+     b. `node scripts/doc-sync.mjs --test-count N`（写测试数缓存，跳过内部 spawn vitest）
+     c. `npm run audit`（check 模式读缓存，不再重复跑 vitest）
+   - 仅文档/脚本/命令（无 `src/`）→ `node scripts/doc-sync.mjs` + `npm run audit`（audit 读缓存，约 1s）
+   - 任一失败 → 停下报告错误原文，不提交。
 
 7. **确认**：把 `git diff --stat` 摘要、文档改动点、生成的提交信息一并展示，等用户明确确认后再提交与推送。
 

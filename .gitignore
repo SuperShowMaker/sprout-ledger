@@ -4,6 +4,9 @@
 # WorkBuddy memory & process docs (machine-specific)
 .workbuddy/
 
+# doc-sync test-count cache (machine-specific)
+.doc-sync-cache.json
+
 # Logs
 logs
 *.log

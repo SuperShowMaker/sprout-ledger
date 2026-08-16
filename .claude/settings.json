@@ -4,5 +4,19 @@
       "Bash(grep -v \"//\\\\|import\\\\|translateCategory\\\\|t\\(\\\\|selectedCat\\\\|cat\\\\.\\\\|categories\")",
       "Bash(npx vitest *)"
     ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash(git commit)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/post-commit-check.mjs",
+            "timeout": 20
+          }
+        ]
+      }
+    ]
   }
 }

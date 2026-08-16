@@ -3,14 +3,25 @@
 // 用法:
 //   node scripts/doc-sync.mjs --check  严格校验（不改写），漂移即退出码 1；接 npm run audit
 //   node scripts/doc-sync.mjs          同步模式（pre-commit 钩子）：事件驱动派生 + 改写 + git add
+//   node scripts/doc-sync.mjs --test-count N  已知测试数，跳过 spawn vitest（/commit 传）；命中缓存同样跳过
 // 幂等：同一状态跑两遍 = 零 diff。只改写 <!-- @audit:... --> 标记区，不碰自由正文。
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CHECK = process.argv.includes('--check');
+
+// 已知测试数（/commit 传入，避免重复 spawn vitest）
+const KNOWN_COUNT = parseTestCountArg();
+function parseTestCountArg() {
+  const i = process.argv.indexOf('--test-count');
+  if (i === -1 || !process.argv[i + 1]) return null;
+  const n = Number(process.argv[i + 1]);
+  return Number.isInteger(n) && n >= 0 ? n : null;
+}
 
 // repo 相对路径 → 绝对
 const abs = (p) => join(ROOT, p);
@@ -51,8 +62,30 @@ function gitAdded() {
 
 /* ---------- 派生事实 ---------- */
 
-// ① 测试数：直接跑 vitest.mjs（绕开 Windows 的 npx/npm .cmd shim）解析 "Tests  N passed"。失败返回 null（跳过，不阻塞）。
+// ① 测试数：优先取 --test-count（/commit 传）→ 缓存命中（src/test/ 哈希未变）→ 否则跑 vitest.mjs（绕开 Windows 的 npx .cmd shim）解析 "Tests  N passed"。失败返回 null（跳过，不阻塞）。
+const CACHE_FILE = '.doc-sync-cache.json';
+function srcTestHash() {
+  try {
+    const files = readdirSync(join(ROOT, 'src', 'test')).sort();
+    const h = createHash('sha1');
+    for (const f of files) h.update(f).update(readFileSync(join(ROOT, 'src', 'test', f)));
+    return h.digest('hex');
+  } catch { return null; }
+}
+function readCache() {
+  try { return JSON.parse(readFileSync(abs(CACHE_FILE), 'utf8')); } catch { return null; }
+}
+function writeCache(c) {
+  try { writeFileSync(abs(CACHE_FILE), JSON.stringify(c), 'utf8'); } catch { /* 忽略 */ }
+}
 function testCount() {
+  const hash = srcTestHash();
+  if (KNOWN_COUNT != null) {
+    if (hash) writeCache({ count: KNOWN_COUNT, hash });
+    return KNOWN_COUNT;
+  }
+  const cached = readCache();
+  if (cached && hash && cached.hash === hash) return cached.count;
   try {
     const out = execFileSync(
       process.execPath,
@@ -60,7 +93,9 @@ function testCount() {
       { cwd: ROOT, encoding: 'utf8' }
     );
     const m = out.match(/Tests\s+(\d+)\s+passed/);
-    return m ? Number(m[1]) : null;
+    const n = m ? Number(m[1]) : null;
+    if (n != null && hash) writeCache({ count: n, hash });
+    return n;
   } catch {
     return null;
   }
