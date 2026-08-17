@@ -1,4 +1,4 @@
-// 青禾记账 - 默认2级分类数据（方案A：11大类，不可删除/不可改名）
+// 青禾记账 - 默认2级分类数据（预设 10 大类；预设项锁定，不可删除）
 export interface Category {
   name: string;
   icon: string;
@@ -35,7 +35,7 @@ export const defaultCat2Names = [
   '其他杂项', '手续费', '临时支出',
 ];
 
-// 收入预设分类（仅一级，无子类）。前端常量方案：不入 categories1 表，避免改分类 schema
+// 收入预设分类（仅一级，无子类）。db.ts 幂等入库的种子常量，兼作锁定名单（incomeCat1Names）
 export const incomeCategories: Category[] = [
   { name: '工资收入', icon: '💰', children: [] },
   { name: '奖金收入', icon: '🏆', children: [] },

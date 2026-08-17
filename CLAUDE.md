@@ -84,10 +84,13 @@ src-tauri/
 - 导入去重：仅按 `created_at`（毫秒级），不做数据内容比对
 - 数据库位置：Windows `%APPDATA%/com.qinghe.ledger/` · Android App 内部存储
 - 表结构变更走幂等 ALTER 迁移（如 `PRAGMA table_info` 检查后补列），已入库用户无需删库；新建库的 CREATE 已含新列
+- CSV 导出公式防护：字段以 `= + - @` Tab/CR 开头加 `'` 前缀、含引号/逗号/换行则双引号包裹（内部引号双写）；导入侧剥掉 `'` 防护前缀，防止回导把标记写进数据（`src/csv.ts`）
+- Tauri 安全：`tauri.conf.json` 的 `csp` 已设（prod 收窄 `connect-src ipc: http://ipc.localhost`，`devCsp` 放行 HMR），不得恢复 `null`；未使用的插件不留权限/依赖（opener 已移除）
 
 ## 开发与沟通
 
 - **热更新**：前端改动自动刷新。只有 Rust / Cargo.toml / tauri.conf.json / capabilities 改了才需重启
 - **文档同步**：pre-commit 钩子（`.githooks/`）自动同步派生事实——测试数/版本/进度条/✅锚点翻转，只改写 `<!-- @audit:... -->` 标记，不碰自由正文。功能落地时把 PRD 对应行 ⏸ 改 ✅ 并确保说明带证明锚点（引用 `src/` 下的路径或测试文件）；版本只改 `src-tauri/tauri.conf.json` 一处。提交新增 `src/` 文件却未带 PRD/README 改动时，打 ⚠ 漏刷新提醒（guardrail，不阻塞）。验证基线：`tsc --noEmit` + `npx vitest run` + `npm run audit`
 - **斜杠命令**：`.claude/commands/` 下 `/commit`（刷新文档→验证→提交→推送）、`/run-dev [desktop|android]`（本地运行）、`/apk-pack`（安卓一键出包）、`/bump [major|minor|patch]`（版本号提升）；手动触发，重启会话后生效。DSH 环境（本 GUI）等价命令：`.dsh/skills/commit` 技能，输入 `/commit` 触发
+- **质量子代理**：`.claude/agents/quality-engineer.md`（只读审计，安全审计 + 注释检查两个方向），配套技能 `.claude/skills/security-audit`（安全审计）与 `.claude/skills/comments-check`（注释检查）；重启会话后生效
 - 技术方案列出选项，用户拍板；一次只抛一个决策点

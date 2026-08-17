@@ -32,10 +32,27 @@ export function normalizeType(v?: string): TxType {
   return s === '收入' || s === 'income' ? 'income' : 'expense';
 }
 
+// CSV 单元转义：公式前缀（=+-@ Tab CR）加 ' 前缀防 Excel 当公式执行；含引号/逗号/换行则双引号包裹、内部引号双写
+function escapeCsvCell(value: string): string {
+  let cell = value;
+  if (/^[=+\-@\t\r]/.test(cell)) cell = `'${cell}`;
+  if (/[",\n\r]/.test(cell)) cell = `"${cell.replace(/"/g, '""')}"`;
+  return cell;
+}
+
+// 去掉导出时加的公式防护前缀 '（导入侧对应还原，避免把防护标记写进数据）
+function stripFormulaGuard(value: string): string {
+  return value.startsWith("'") ? value.slice(1) : value;
+}
+
 // 单行导出（7 列，类型在末列）
 export function buildExportRow(exp: Expense, lang: Lang): string {
   const type = typeLabel(exp.type || 'expense', lang);
-  return `${exp.date},${translateCategory(lang, exp.category1)},${translateCategory(lang, exp.category2)},${exp.amount.toFixed(2)},${(exp.note || '').replace(/,/g, '，')},\t${exp.created_at || ''},${type}`;
+  const cat1 = escapeCsvCell(translateCategory(lang, exp.category1));
+  const cat2 = escapeCsvCell(translateCategory(lang, exp.category2));
+  const note = escapeCsvCell((exp.note || '').replace(/,/g, '，'));
+  const createdAt = escapeCsvCell(exp.created_at || '');
+  return `${exp.date},${cat1},${cat2},${exp.amount.toFixed(2)},${note},\t${createdAt},${type}`;
 }
 
 export interface CsvCategoryMap {
@@ -62,7 +79,7 @@ export function parseImportCsv(content: string, categories?: CsvCategoryMap): Pa
   const parsed: Expense[] = [];
   const errors: string[] = [];
   for (let i = 1; i < lines.length; i++) {
-    const c = lines[i].split(',').map((x) => x.trim());
+    const c = lines[i].split(',').map((x) => stripFormulaGuard(x.trim()));
     if (c.length < (is7 ? 7 : 6)) { errors.push(`第${i + 1}行:列数不足`); continue; }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(c[0])) { errors.push(`第${i + 1}行:日期格式错误`); continue; }
     const amount = parseFloat(c[3]);

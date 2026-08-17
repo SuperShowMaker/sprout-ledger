@@ -34,7 +34,7 @@ npm run tauri android build -- --apk   # 单文件通用 APK
 npm test
 ```
 
-> 用例数：205<!-- @audit:test-count -->（pre-commit 自动同步）
+> 用例数：208<!-- @audit:test-count -->（pre-commit 自动同步）
 
 ## 版本
 
